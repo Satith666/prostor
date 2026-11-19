@@ -45,7 +45,8 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid>
+    <Grid Background="{StaticResource Bg}" TextElement.Foreground="{StaticResource Text}"
+          TextElement.FontFamily="Segoe UI Variable Text, Segoe UI" TextElement.FontSize="13">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="248"/>
             <ColumnDefinition Width="*"/>

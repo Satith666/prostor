@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -37,3 +37,30 @@ jobs:
           name: build-errors
           path: build-errors.txt
           if-no-files-found: ignore
+
+      # Снимки всех страниц в демо-режиме — чтобы проверять дизайн без живого экрана.
+      - name: Screenshots
+        if: success()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force shots | Out-Null
+          $p = Start-Process -FilePath "dist/WinPulse.exe" -ArgumentList '--demo', '--screenshots', "$PWD/shots" -PassThru
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); "timeout" | Out-File shots/timeout.txt }
+          Get-ChildItem shots | Format-Table Name, Length
+
+      - name: Publish screenshots to branch winpulse-shots
+        if: success() && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          git config user.name "winpulse-ci"
+          git config user.email "winpulse-ci@users.noreply.github.com"
+          $tmp = Join-Path $env:RUNNER_TEMP "shots-repo"
+          New-Item -ItemType Directory -Force $tmp | Out-Null
+          Copy-Item shots/* $tmp
+          Set-Location $tmp
+          git init -q
+          git checkout -q -b winpulse-shots
+          "Commit: $env:GITHUB_SHA" | Out-File SOURCE.txt
+          git add -A
+          git -c user.name=winpulse-ci -c user.email=winpulse-ci@users.noreply.github.com commit -q -m "Снимки экрана для $env:GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" winpulse-shots

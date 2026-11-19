@@ -1,4 +1,7 @@
+using System.IO;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WinPulse.App.Infrastructure;
 using WinPulse.App.ViewModels;
@@ -13,6 +16,8 @@ namespace WinPulse.App;
 public partial class App : Application
 {
     private MainViewModel? _vm;
+    /// <summary>Режим снимков экрана для сборки на GitHub: без окон с сообщениями.</summary>
+    private bool _headless;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -40,6 +45,9 @@ public partial class App : Application
         var settings = AppSettings.Load();
         Lang.English = settings.Language == "en";
         bool demo = args.Any(a => a.Equals("--demo", StringComparison.OrdinalIgnoreCase));
+        int shotsIndex = Array.FindIndex(args, a => a.Equals("--screenshots", StringComparison.OrdinalIgnoreCase));
+        string? shotsDir = shotsIndex >= 0 && shotsIndex + 1 < args.Length ? args[shotsIndex + 1] : null;
+        _headless = shotsDir is not null;
         Log.Info($"Запуск: {Environment.OSVersion}, {(demo ? "демо-режим" : "обычный режим")}, администратор: {OsInfo.IsElevated()}");
 
         ISystemSource source;
@@ -62,6 +70,64 @@ public partial class App : Application
         window.Closed += (_, _) => Shutdown();
         window.Show();
         _vm.Start();
+        if (shotsDir is not null) _ = ScreenshotTourAsync(window, _vm, shotsDir);
+    }
+
+    /// <summary>
+    /// Обходит все страницы и сохраняет их снимки в PNG — чтобы проверять дизайн по сборке на GitHub, где нет живого экрана.
+    /// Интерфейс отрисовывается вне окна в фиксированном размере: экран у сборочной машины меньше окна программы.
+    /// </summary>
+    private static async Task ScreenshotTourAsync(Window window, MainViewModel vm, string dir)
+    {
+        Directory.CreateDirectory(dir);
+        var size = new Size(1320, 900);
+        try
+        {
+            var root = (FrameworkElement)window.Content;
+            window.Content = null;
+            root.DataContext = vm;
+            void Layout()
+            {
+                root.Measure(size);
+                root.Arrange(new Rect(size));
+                root.UpdateLayout();
+            }
+
+            Layout();
+            await Task.Delay(10000);
+            int n = 0;
+            foreach (var item in vm.Nav.ToList())
+            {
+                if (item.Soon) continue;
+                item.IsSelected = true;
+                Layout();
+                bool slow = item.Key is "problems" or "drivers" or "startup" or "windowed" or "optimize";
+                await Task.Delay(slow ? 8000 : 3000);
+                Layout();
+                var bitmap = new RenderTargetBitmap((int)size.Width, (int)size.Height, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(root);
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using var file = File.Create(Path.Combine(dir, $"{++n:00}-{item.Key}.png"));
+                encoder.Save(file);
+            }
+        }
+        catch (Exception ex)
+        {
+            File.WriteAllText(Path.Combine(dir, "tour-error.txt"), ex.ToString());
+        }
+        finally
+        {
+            try
+            {
+                File.Copy(Log.FilePath, Path.Combine(dir, "winpulse.log"), true);
+            }
+            catch
+            {
+                // Журнала может не быть — не страшно.
+            }
+            window.Close();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -80,6 +146,11 @@ public partial class App : Application
     private void OnDispatcherException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Log.Error("ui", e.Exception);
+        if (_headless)
+        {
+            e.Handled = true;
+            return;
+        }
         MessageBox.Show(
             "Произошла ошибка. Она записана в журнал, программа продолжит работу.\n\n" + e.Exception.Message +
             "\n\nЖурнал: " + Log.FilePath,
