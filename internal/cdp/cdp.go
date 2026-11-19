@@ -52,7 +52,8 @@ func Launch(exe string, width, height int) (*Browser, error) {
 	if winapi.IsWindows && winapi.IsAdmin() {
 		args = append(args, "--do-not-de-elevate")
 	}
-	if !winapi.IsWindows && os.Geteuid() == 0 {
+	// as root, and on CI runners where AppArmor blocks Chrome's sandbox
+	if !winapi.IsWindows && (os.Geteuid() == 0 || os.Getenv("CI") == "true") {
 		args = append(args, "--no-sandbox")
 	}
 	args = append(args, "about:blank")

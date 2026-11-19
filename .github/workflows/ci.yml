@@ -25,8 +25,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Зависимости
-        run: sudo apt-get install -y python3-pil
+        run: python -m pip install pillow
       - name: Полная проверка
         run: ./check.sh
       - uses: actions/upload-artifact@v4
