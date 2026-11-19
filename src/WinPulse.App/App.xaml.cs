@@ -48,6 +48,7 @@ public partial class App : Application
         int shotsIndex = Array.FindIndex(args, a => a.Equals("--screenshots", StringComparison.OrdinalIgnoreCase));
         string? shotsDir = shotsIndex >= 0 && shotsIndex + 1 < args.Length ? args[shotsIndex + 1] : null;
         _headless = shotsDir is not null;
+        if (shotsDir is not null) Mark(shotsDir, "startup");
         Log.Info($"Запуск: {Environment.OSVersion}, {(demo ? "демо-режим" : "обычный режим")}, администратор: {OsInfo.IsElevated()}");
 
         ISystemSource source;
@@ -68,18 +69,38 @@ public partial class App : Application
         var window = new MainWindow { DataContext = _vm };
         MainWindow = window;
         window.Closed += (_, _) => Shutdown();
+        if (shotsDir is not null) Mark(shotsDir, "before show");
         window.Show();
+        if (shotsDir is not null) Mark(shotsDir, "shown");
         _vm.Start();
-        if (shotsDir is not null) _ = ScreenshotTourAsync(window, _vm, shotsDir);
+        if (shotsDir is not null)
+        {
+            Mark(shotsDir, "started");
+            _ = ScreenshotTourAsync(window, _vm, shotsDir);
+        }
     }
 
     /// <summary>
     /// Обходит все страницы и сохраняет их снимки в PNG — чтобы проверять дизайн по сборке на GitHub, где нет живого экрана.
     /// Интерфейс отрисовывается вне окна в фиксированном размере: экран у сборочной машины меньше окна программы.
     /// </summary>
+    private static void Mark(string dir, string text)
+    {
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "progress.txt"), $"{DateTime.Now:HH:mm:ss.fff} {text}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Метки — только для диагностики.
+        }
+    }
+
     private static async Task ScreenshotTourAsync(Window window, MainViewModel vm, string dir)
     {
         Directory.CreateDirectory(dir);
+        Mark(dir, "tour begin");
         var size = new Size(1320, 900);
         try
         {
@@ -94,11 +115,14 @@ public partial class App : Application
             }
 
             Layout();
+            Mark(dir, "first layout");
             await Task.Delay(10000);
+            Mark(dir, "warmed up");
             int n = 0;
             foreach (var item in vm.Nav.ToList())
             {
                 if (item.Soon) continue;
+                Mark(dir, "page " + item.Key);
                 item.IsSelected = true;
                 Layout();
                 bool slow = item.Key is "problems" or "drivers" or "startup" or "windowed" or "optimize";
@@ -110,6 +134,7 @@ public partial class App : Application
                 encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 using var file = File.Create(Path.Combine(dir, $"{++n:00}-{item.Key}.png"));
                 encoder.Save(file);
+                Mark(dir, "saved " + item.Key);
             }
         }
         catch (Exception ex)
