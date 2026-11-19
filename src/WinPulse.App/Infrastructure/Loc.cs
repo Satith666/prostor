@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using System.Windows.Data;
+using System.Windows.Markup;
 using WinPulse.Core;
 
 namespace WinPulse.App.Infrastructure;
@@ -144,5 +146,51 @@ public sealed class Loc : INotifyPropertyChanged
 
     public static string Get(string key) => I[key];
 
+    /// <summary>
+    /// Пара строк прямо из XAML ({i:L 'Русский', 'English'}). Ключ — хеш русского текста: в пути привязки
+    /// запятые и скобки внутри [ ] ломают разбор индексатора.
+    /// </summary>
+    public static string Register(string ru, string en)
+    {
+        ulong hash = 14695981039346656037UL;
+        foreach (char c in ru)
+        {
+            hash ^= c;
+            hash *= 1099511628211UL;
+        }
+        string key = "@" + hash.ToString("x16");
+        lock (Map)
+            Map.TryAdd(key, (ru, en));
+        return key;
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+/// <summary>
+/// Текст на двух языках прямо в разметке: Text="{i:L 'Начать замер', 'Start measuring'}".
+/// Возвращает привязку к <see cref="Loc"/>, поэтому язык меняется на лету, как и у ключей Loc.
+/// </summary>
+[MarkupExtensionReturnType(typeof(object))]
+public sealed class L : MarkupExtension
+{
+    public L()
+    {
+    }
+
+    public L(string ru, string en)
+    {
+        Ru = ru;
+        En = en;
+    }
+
+    [ConstructorArgument("ru")] public string Ru { get; set; } = "";
+    [ConstructorArgument("en")] public string En { get; set; } = "";
+
+    public override object ProvideValue(IServiceProvider serviceProvider)
+    {
+        string key = Loc.Register(Ru, En);
+        var binding = new Binding($"[{key}]") { Source = Loc.I, Mode = BindingMode.OneWay };
+        return binding.ProvideValue(serviceProvider);
+    }
 }

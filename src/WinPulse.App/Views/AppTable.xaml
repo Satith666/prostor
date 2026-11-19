@@ -67,7 +67,7 @@
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
-                <TextBlock Text="ПРИЛОЖЕНИЕ"/>
+                <TextBlock Text="{i:L 'ПРИЛОЖЕНИЕ', 'APP'}"/>
             </Button>
             <Button Grid.Column="2" CommandParameter="cpu">
                 <Button.Style>
@@ -79,7 +79,7 @@
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
-                <TextBlock Text="ПРОЦЕССОР"/>
+                <TextBlock Text="{i:L 'ПРОЦЕССОР', 'CPU'}"/>
             </Button>
             <Button Grid.Column="3" CommandParameter="memory">
                 <Button.Style>
@@ -91,7 +91,7 @@
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
-                <TextBlock Text="ПАМЯТЬ"/>
+                <TextBlock Text="{i:L 'ПАМЯТЬ', 'MEMORY'}"/>
             </Button>
             <Button Grid.Column="4" CommandParameter="disk">
                 <Button.Style>
@@ -103,7 +103,7 @@
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
-                <TextBlock Text="ДИСК"/>
+                <TextBlock Text="{i:L 'ДИСК', 'DISK'}"/>
             </Button>
             <Button Grid.Column="5" CommandParameter="gpu">
                 <Button.Style>
@@ -115,7 +115,7 @@
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
-                <TextBlock Text="ВИДЕО"/>
+                <TextBlock Text="{i:L 'ВИДЕО', 'GPU'}"/>
             </Button>
         </Grid>
         <Border Height="1" Background="{StaticResource Line}" Margin="0,0,0,4"/>
@@ -213,9 +213,9 @@
                                                     </TextBlock>
                                                     <TextBlock Style="{StaticResource FaintText}" Margin="8,0,0,0" VerticalAlignment="Center"
                                                                Visibility="{Binding ProMode, Source={x:Static i:UiState.I}, Converter={StaticResource BoolToVis}}">
-                                                        <Run Text="· потоков"/>
+                                                        <Run Text="{i:L '· потоков', '· threads'}"/>
                                                         <Run Text="{Binding Threads, Mode=OneWay}"/>
-                                                        <Run Text="· дескрипторов"/>
+                                                        <Run Text="{i:L '· дескрипторов', '· handles'}"/>
                                                         <Run Text="{Binding Handles, Mode=OneWay}"/>
                                                     </TextBlock>
                                                     <TextBlock Text="{Binding Detail}" Style="{StaticResource FaintText}" Margin="8,0,0,0"
@@ -230,9 +230,9 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <Button Style="{StaticResource Btn}" Padding="10,4" Command="{Binding OpenFolderCommand}" Content="Открыть папку"/>
+                                    <Button Style="{StaticResource Btn}" Padding="10,4" Command="{Binding OpenFolderCommand}" Content="{i:L 'Открыть папку', 'Open folder'}"/>
                                     <Button Style="{StaticResource BtnDanger}" Padding="10,4" Margin="8,0,0,0" Command="{Binding EndCommand}"
-                                            Content="Завершить"
+                                            Content="{i:L 'Завершить', 'End task'}"
                                             Visibility="{Binding ProMode, Source={x:Static i:UiState.I}, Converter={StaticResource BoolToVis}}"/>
                                 </StackPanel>
                             </StackPanel>

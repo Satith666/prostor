@@ -112,7 +112,7 @@
                     <Button Style="{StaticResource BtnGhost}" HorizontalAlignment="Left" Padding="0,2" Margin="0,2,0,0"
                             Command="{Binding RestartAsAdminCommand}"
                             Visibility="{Binding IsElevated, Converter={StaticResource BoolToVisInv}}">
-                        <TextBlock Text="Перезапустить от администратора" FontSize="12"/>
+                        <TextBlock Text="{i:L 'Перезапустить от администратора', 'Restart as administrator'}" FontSize="12"/>
                     </Button>
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                         <TextBlock Text="{Binding VersionText}" Style="{StaticResource FaintText}" VerticalAlignment="Center"/>

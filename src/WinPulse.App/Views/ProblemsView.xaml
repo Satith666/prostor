@@ -25,8 +25,8 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="28,24,28,28" MaxWidth="1100" HorizontalAlignment="Stretch">
-            <TextBlock Text="Проблемы" Style="{StaticResource H1}"/>
-            <TextBlock Text="Журналы Windows за 30 дней, устройства и диски — что случалось, что это значит и что делать. Ничего не меняется: WinPulse только читает."
+            <TextBlock Text="{i:L 'Проблемы', 'Problems'}" Style="{StaticResource H1}"/>
+            <TextBlock Text="{i:L 'Журналы Windows за 30 дней, устройства и диски — что случалось, что это значит и что делать. Ничего не меняется: WinPulse только читает.', 'Windows logs for 30 days, devices and disks — what happened, what it means and what to do. Nothing is changed: WinPulse only reads.'}"
                        Style="{StaticResource MutedText}" Margin="0,6,0,18"/>
 
             <!-- Итог -->
@@ -51,10 +51,10 @@
                         </ItemsControl>
                     </StackPanel>
                     <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                        <Button Style="{StaticResource BtnPrimary}" Padding="16,8" Command="{Binding ScanCommand}" Content="Проверить снова"/>
-                        <Button Style="{StaticResource Btn}" Margin="0,8,0,0" Command="{Binding SaveReportCommand}" Content="Сохранить отчёт"/>
+                        <Button Style="{StaticResource BtnPrimary}" Padding="16,8" Command="{Binding ScanCommand}" Content="{i:L 'Проверить снова', 'Check again'}"/>
+                        <Button Style="{StaticResource Btn}" Margin="0,8,0,0" Command="{Binding SaveReportCommand}" Content="{i:L 'Сохранить отчёт', 'Save report'}"/>
                         <Button Style="{StaticResource BtnGhost}" Margin="0,6,0,0" HorizontalAlignment="Center"
-                                Command="{Binding OpenReliabilityCommand}" Content="Монитор стабильности"/>
+                                Command="{Binding OpenReliabilityCommand}" Content="{i:L 'Монитор стабильности', 'Reliability Monitor'}"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -63,14 +63,14 @@
             <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                 <StackPanel>
                     <Grid>
-                        <TextBlock Text="ХРОНОЛОГИЯ ЗА 30 ДНЕЙ" Style="{StaticResource Caption}"/>
+                        <TextBlock Text="{i:L 'ХРОНОЛОГИЯ ЗА 30 ДНЕЙ', 'TIMELINE, 30 DAYS'}" Style="{StaticResource Caption}"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Border Width="9" Height="9" CornerRadius="2" Background="{StaticResource Bad}" VerticalAlignment="Center"/>
-                            <TextBlock Text="критично" Style="{StaticResource FaintText}" Margin="5,0,12,0"/>
+                            <TextBlock Text="{i:L 'критично', 'critical'}" Style="{StaticResource FaintText}" Margin="5,0,12,0"/>
                             <Border Width="9" Height="9" CornerRadius="2" Background="{StaticResource Warn}" VerticalAlignment="Center"/>
-                            <TextBlock Text="ошибки" Style="{StaticResource FaintText}" Margin="5,0,12,0"/>
+                            <TextBlock Text="{i:L 'ошибки', 'errors'}" Style="{StaticResource FaintText}" Margin="5,0,12,0"/>
                             <Border Width="9" Height="9" CornerRadius="2" Background="{StaticResource Yellow}" VerticalAlignment="Center"/>
-                            <TextBlock Text="предупреждения" Style="{StaticResource FaintText}" Margin="5,0,0,0"/>
+                            <TextBlock Text="{i:L 'предупреждения', 'warnings'}" Style="{StaticResource FaintText}" Margin="5,0,0,0"/>
                         </StackPanel>
                     </Grid>
                     <c:DaysChart Height="96" Margin="0,12,0,0" Days="{Binding Days}"
@@ -83,7 +83,7 @@
             <!-- Всё хорошо -->
             <Border Style="{StaticResource Card}" Margin="0,16,0,0" Background="{StaticResource GoodBg}" BorderBrush="#5534D399"
                     Visibility="{Binding NoProblems, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="За 30 дней серьёзных проблем не найдено. Ниже можно посмотреть, что именно проверено."
+                <TextBlock Text="{i:L 'За 30 дней серьёзных проблем не найдено. Ниже можно посмотреть, что именно проверено.', 'No serious problems in 30 days. See below what exactly was checked.'}"
                            Foreground="{StaticResource Good}" TextWrapping="Wrap"/>
             </Border>
 
@@ -125,7 +125,7 @@
 
                                     <StackPanel Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
                                         <StackPanel Margin="0,12,0,0" Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVis}}">
-                                            <TextBlock Text="ЧТО ДЕЛАТЬ" Style="{StaticResource Caption}" Margin="0,0,0,6"/>
+                                            <TextBlock Text="{i:L 'ЧТО ДЕЛАТЬ', 'WHAT TO DO'}" Style="{StaticResource Caption}" Margin="0,0,0,6"/>
                                             <ItemsControl ItemsSource="{Binding Advice}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
@@ -138,7 +138,7 @@
                                         <Border Background="{StaticResource Bg}" CornerRadius="7" Padding="10,8" Margin="0,10,0,0"
                                                 Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVis}}">
                                             <StackPanel>
-                                                <TextBlock Text="ЗАПИСИ" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                                                <TextBlock Text="{i:L 'ЗАПИСИ', 'ENTRIES'}" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
                                                 <ItemsControl ItemsSource="{Binding Evidence}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>

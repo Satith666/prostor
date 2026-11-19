@@ -37,9 +37,9 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="30,26,30,30">
-            <TextBlock Text="FPS-лаборатория" Style="{StaticResource H1}"/>
+            <TextBlock Text="{i:L 'FPS-лаборатория', 'FPS lab'}" Style="{StaticResource H1}"/>
             <TextBlock Style="{StaticResource MutedText}" Margin="0,6,0,20" MaxWidth="900" HorizontalAlignment="Left"
-                       Text="Замер FPS и 1% low в любой игре — с выводом, во что она упирается. А пока вы играете, WinPulse сам записывает сессию и потом показывает, что мешало игре и в какие моменты."/>
+                       Text="{i:L 'Замер FPS и 1% low в любой игре — с выводом, во что она упирается. А пока вы играете, WinPulse сам записывает сессию и потом показывает, что мешало игре и в какие моменты.', 'Measure FPS and 1% lows in any game and see what it\'s bound by. While you play, WinPulse records the session on its own and later shows what got in the game\'s way and when.'}"/>
 
             <!-- Игровой режим -->
             <Border Style="{StaticResource Card}" Margin="0,0,0,16">
@@ -49,24 +49,24 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Margin="0,0,20,0">
-                        <TextBlock Text="Игровой режим" Style="{StaticResource H2}"/>
+                        <TextBlock Text="{i:L 'Игровой режим', 'Game mode'}" Style="{StaticResource H2}"/>
                         <TextBlock Text="{Binding BoostText}" Style="{StaticResource MutedText}" Margin="0,6,0,12"/>
                         <WrapPanel>
                             <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding BoostPower, Mode=TwoWay}" Margin="0,0,22,8"
-                                          ToolTip="«Высокая» или «Максимальная производительность» на время игры, потом — прежняя схема.">
-                                <TextBlock Text="Схема питания на максимум"/>
+                                          ToolTip="{i:L '«Высокая» или «Максимальная производительность» на время игры, потом — прежняя схема.', 'High or Ultimate Performance while you play, then the previous plan.'}">
+                                <TextBlock Text="{i:L 'Схема питания на максимум', 'Max-performance power plan'}"/>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding BoostWallpaper, Mode=TwoWay}" Margin="0,0,22,8"
-                                          ToolTip="Штатная команда Wallpaper Engine «-control pause»; после игры — «-control play».">
-                                <TextBlock Text="Пауза Wallpaper Engine"/>
+                                          ToolTip="{i:L 'Штатная команда Wallpaper Engine «-control pause»; после игры — «-control play».', 'Wallpaper Engine\'s own \'-control pause\' command; after the game, \'-control play\'.'}">
+                                <TextBlock Text="{i:L 'Пауза Wallpaper Engine', 'Pause Wallpaper Engine'}"/>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding BoostGamePriority, Mode=TwoWay}" Margin="0,0,22,8"
-                                          ToolTip="Приоритет «Высокий» (не «реального времени» — тот опасен для стабильности).">
-                                <TextBlock Text="Высокий приоритет игре"/>
+                                          ToolTip="{i:L 'Приоритет «Высокий» (не «реального времени» — тот опасен для стабильности).', 'High priority (not Realtime — that one hurts stability).'}">
+                                <TextBlock Text="{i:L 'Высокий приоритет игре', 'High priority for the game'}"/>
                             </ToggleButton>
                             <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding BoostBackground, Mode=TwoWay}" Margin="0,0,22,8"
-                                          ToolTip="Браузеры, мессенджеры, лаунчеры и облачные диски получают приоритет ниже обычного. OBS не трогаем.">
-                                <TextBlock Text="Фоновые программы — пониже"/>
+                                          ToolTip="{i:L 'Браузеры, мессенджеры, лаунчеры и облачные диски получают приоритет ниже обычного. OBS не трогаем.', 'Browsers, messengers, launchers and cloud drives get below-normal priority. OBS is left alone.'}">
+                                <TextBlock Text="{i:L 'Фоновые программы — пониже', 'Background apps lower'}"/>
                             </ToggleButton>
                         </WrapPanel>
                     </StackPanel>
@@ -85,8 +85,8 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <TextBlock Text="Замер FPS" Style="{StaticResource H2}"/>
-                        <TextBlock Text="ИГРА" Style="{StaticResource Caption}" Margin="0,14,0,6"/>
+                        <TextBlock Text="{i:L 'Замер FPS', 'FPS measurement'}" Style="{StaticResource H2}"/>
+                        <TextBlock Text="{i:L 'ИГРА', 'GAME'}" Style="{StaticResource Caption}" Margin="0,14,0,6"/>
                         <ListBox Style="{StaticResource PlainList}" ItemsSource="{Binding Targets}" SelectedItem="{Binding Target, Mode=TwoWay}"
                                  MaxHeight="190" IsEnabled="{Binding IsMeasuring, Converter={StaticResource Not}}">
                             <ListBox.ItemTemplate>
@@ -106,31 +106,31 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
                         <TextBlock Style="{StaticResource FaintText}" TextWrapping="Wrap" Margin="2,6,0,0"
-                                   Text="Запустите игру — она появится в списке сама (по папке установки или нагрузке на видеокарту)."
+                                   Text="{i:L 'Запустите игру — она появится в списке сама (по папке установки или нагрузке на видеокарту).', 'Start a game — it shows up here on its own (by install folder or GPU load).'}"
                                    Visibility="{Binding Targets.Count, Converter={StaticResource ZeroToVis}}"/>
 
-                        <TextBlock Text="ДЛИТЕЛЬНОСТЬ" Style="{StaticResource Caption}" Margin="0,16,0,6"/>
+                        <TextBlock Text="{i:L 'ДЛИТЕЛЬНОСТЬ', 'DURATION'}" Style="{StaticResource Caption}" Margin="0,16,0,6"/>
                         <Border Background="{StaticResource PanelAlt}" CornerRadius="10" Padding="3" HorizontalAlignment="Left">
                             <StackPanel Orientation="Horizontal">
-                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="30 с" IsChecked="{Binding Is30, Mode=TwoWay}"/>
-                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="1 мин" IsChecked="{Binding Is60, Mode=TwoWay}"/>
-                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="2 мин" IsChecked="{Binding Is120, Mode=TwoWay}"/>
-                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="5 мин" IsChecked="{Binding Is300, Mode=TwoWay}"/>
+                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="{i:L '30 с', '30 s'}" IsChecked="{Binding Is30, Mode=TwoWay}"/>
+                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="{i:L '1 мин', '1 min'}" IsChecked="{Binding Is60, Mode=TwoWay}"/>
+                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="{i:L '2 мин', '2 min'}" IsChecked="{Binding Is120, Mode=TwoWay}"/>
+                                <RadioButton Style="{StaticResource Segment}" GroupName="dur" Content="{i:L '5 мин', '5 min'}" IsChecked="{Binding Is300, Mode=TwoWay}"/>
                             </StackPanel>
                         </Border>
 
                         <WrapPanel Margin="0,18,0,0">
                             <Button Style="{StaticResource BtnPrimary}" Command="{Binding StartCommand}" Margin="0,0,10,6" Padding="18,9"
                                     Visibility="{Binding IsMeasuring, Converter={StaticResource BoolToVisInv}}">
-                                <TextBlock Text="Начать замер" FontSize="14"/>
+                                <TextBlock Text="{i:L 'Начать замер', 'Start measuring'}" FontSize="14"/>
                             </Button>
                             <Button Style="{StaticResource Btn}" Command="{Binding StopCommand}" Margin="0,0,10,6" Padding="18,9"
                                     Visibility="{Binding IsMeasuring, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="Остановить" FontSize="14"/>
+                                <TextBlock Text="{i:L 'Остановить', 'Stop'}" FontSize="14"/>
                             </Button>
                             <Button Style="{StaticResource Btn}" Command="{Binding DownloadCommand}" Margin="0,0,10,6"
-                                    Visibility="{Binding HasTool, Converter={StaticResource BoolToVisInv}}" Content="Скачать PresentMon"/>
-                            <Button Style="{StaticResource BtnGhost}" Command="{Binding OpenCapturesCommand}" Margin="0,0,0,6" Content="Папка с замерами"/>
+                                    Visibility="{Binding HasTool, Converter={StaticResource BoolToVisInv}}" Content="{i:L 'Скачать PresentMon', 'Download PresentMon'}"/>
+                            <Button Style="{StaticResource BtnGhost}" Command="{Binding OpenCapturesCommand}" Margin="0,0,0,6" Content="{i:L 'Папка с замерами', 'Captures folder'}"/>
                         </WrapPanel>
                         <TextBlock Text="{Binding ToolText}" Style="{StaticResource FaintText}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                         <TextBlock Text="{Binding StatusText}" Style="{StaticResource MutedText}" Margin="0,8,0,0"
@@ -144,14 +144,14 @@
                     <Grid>
                         <!-- Идёт замер -->
                         <StackPanel Visibility="{Binding IsMeasuring, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="ИДЁТ ЗАМЕР" Style="{StaticResource Caption}" Foreground="#C4B5FD"/>
+                            <TextBlock Text="{i:L 'ИДЁТ ЗАМЕР', 'MEASURING'}" Style="{StaticResource Caption}" Foreground="#C4B5FD"/>
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                 <TextBlock Text="{Binding LiveFpsText}" Style="{StaticResource BigNumber}" FontSize="72" Effect="{StaticResource GlowViolet}"/>
                                 <TextBlock Text="FPS" FontSize="16" Foreground="{StaticResource Muted}" VerticalAlignment="Bottom" Margin="10,0,0,14"/>
                             </StackPanel>
                             <ProgressBar Height="6" Margin="0,14,0,0" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
                                          Foreground="{StaticResource AccentGradient}" Background="{StaticResource Track}" BorderThickness="0"/>
-                            <TextBlock Text="Переключитесь в игру и играйте как обычно. Итог появится здесь." Style="{StaticResource MutedText}" Margin="0,12,0,0"/>
+                            <TextBlock Text="{i:L 'Переключитесь в игру и играйте как обычно. Итог появится здесь.', 'Switch to the game and play as usual. The result will appear here.'}" Style="{StaticResource MutedText}" Margin="0,12,0,0"/>
                         </StackPanel>
 
                         <!-- Результат -->
@@ -162,11 +162,11 @@
                                     <Binding Path="IsMeasuring" Converter="{StaticResource Not}"/>
                                 </MultiBinding>
                             </StackPanel.Visibility>
-                            <TextBlock Text="ПОСЛЕДНИЙ ЗАМЕР" Style="{StaticResource Caption}" Foreground="#C4B5FD"/>
+                            <TextBlock Text="{i:L 'ПОСЛЕДНИЙ ЗАМЕР', 'LAST MEASUREMENT'}" Style="{StaticResource Caption}" Foreground="#C4B5FD"/>
                             <TextBlock Text="{Binding ResultTitle}" Style="{StaticResource MutedText}" Margin="0,6,0,0"/>
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                 <TextBlock Text="{Binding AvgText}" Style="{StaticResource BigNumber}" FontSize="64"/>
-                                <TextBlock Text="FPS в среднем" FontSize="15" Foreground="{StaticResource Muted}" VerticalAlignment="Bottom" Margin="10,0,0,12"/>
+                                <TextBlock Text="{i:L 'FPS в среднем', 'average FPS'}" FontSize="15" Foreground="{StaticResource Muted}" VerticalAlignment="Bottom" Margin="10,0,0,12"/>
                             </StackPanel>
                             <UniformGrid Columns="3" Margin="0,6,0,0">
                                 <StackPanel>
@@ -179,7 +179,7 @@
                                 </StackPanel>
                                 <StackPanel>
                                     <TextBlock Text="{Binding FrameTimeText}" Style="{StaticResource BigNumber}" FontSize="22"/>
-                                    <TextBlock Text="время кадра" Style="{StaticResource FaintText}"/>
+                                    <TextBlock Text="{i:L 'время кадра', 'frame time'}" Style="{StaticResource FaintText}"/>
                                 </StackPanel>
                             </UniformGrid>
                             <c:AreaChart Height="70" Margin="0,14,0,0" Values="{Binding ResultChart}" Stroke="{StaticResource Violet}" FillOpacity="0.2" MinimumScale="30"/>
@@ -199,7 +199,7 @@
                                 </MultiBinding>
                             </StackPanel.Visibility>
                             <TextBlock Text="—" Style="{StaticResource BigNumber}" FontSize="64" Foreground="{StaticResource Faint}"/>
-                            <TextBlock Text="Выберите игру и нажмите «Начать замер». Итог покажет средний FPS, 1% low и во что упирается игра: в видеокарту, процессор или ограничитель кадров."
+                            <TextBlock Text="{i:L 'Выберите игру и нажмите «Начать замер». Итог покажет средний FPS, 1% low и во что упирается игра: в видеокарту, процессор или ограничитель кадров.', 'Pick a game and press Start measuring. You\'ll get average FPS, 1% lows and what the game is bound by: GPU, CPU or a frame cap.'}"
                                        Style="{StaticResource MutedText}" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Grid>
@@ -209,7 +209,7 @@
             <!-- История замеров -->
             <Border Style="{StaticResource Card}" Margin="0,16,0,0" Visibility="{Binding History.Count, Converter={StaticResource ZeroToVisInv}}">
                 <StackPanel>
-                    <TextBlock Text="История замеров" Style="{StaticResource H2}" Margin="0,0,0,10"/>
+                    <TextBlock Text="{i:L 'История замеров', 'Measurement history'}" Style="{StaticResource H2}" Margin="0,0,0,10"/>
                     <Grid Margin="10,0,10,6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -218,11 +218,11 @@
                             <ColumnDefinition Width="90"/>
                             <ColumnDefinition Width="90"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="ИГРА" Style="{StaticResource Caption}"/>
-                        <TextBlock Grid.Column="1" Text="КОГДА" Style="{StaticResource Caption}"/>
-                        <TextBlock Grid.Column="2" Text="СРЕДНИЙ FPS" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
+                        <TextBlock Text="{i:L 'ИГРА', 'GAME'}" Style="{StaticResource Caption}"/>
+                        <TextBlock Grid.Column="1" Text="{i:L 'КОГДА', 'WHEN'}" Style="{StaticResource Caption}"/>
+                        <TextBlock Grid.Column="2" Text="{i:L 'СРЕДНИЙ FPS', 'AVG FPS'}" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
                         <TextBlock Grid.Column="3" Text="1% LOW" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
-                        <TextBlock Grid.Column="4" Text="К ПРОШЛОМУ" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
+                        <TextBlock Grid.Column="4" Text="{i:L 'К ПРОШЛОМУ', 'VS PREVIOUS'}" Style="{StaticResource Caption}" HorizontalAlignment="Right"/>
                     </Grid>
                     <ItemsControl ItemsSource="{Binding History}" Focusable="False">
                         <ItemsControl.ItemTemplate>
@@ -266,7 +266,7 @@
             <!-- Игровые сессии -->
             <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                 <StackPanel>
-                    <TextBlock Text="Игровые сессии" Style="{StaticResource H2}"/>
+                    <TextBlock Text="{i:L 'Игровые сессии', 'Game sessions'}" Style="{StaticResource H2}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,8,0,14">
                         <Ellipse Width="9" Height="9" Margin="0,0,8,0" VerticalAlignment="Center">
                             <Ellipse.Style>
@@ -286,7 +286,7 @@
 
                     <TextBlock Style="{StaticResource FaintText}" TextWrapping="Wrap"
                                Visibility="{Binding HasSessions, Converter={StaticResource BoolToVisInv}}"
-                               Text="Записей пока нет. Поиграйте хотя бы минуту — после выхода из игры здесь появится разбор: во что упиралась игра, какие программы отнимали ресурсы и что происходило, когда проседали кадры."/>
+                               Text="{i:L 'Записей пока нет. Поиграйте хотя бы минуту — после выхода из игры здесь появится разбор: во что упиралась игра, какие программы отнимали ресурсы и что происходило, когда проседали кадры.', 'No sessions yet. Play for at least a minute — after you quit, a breakdown appears here: what the game was bound by, which apps took resources and what happened when frames dropped.'}"/>
 
                     <Grid Visibility="{Binding HasSessions, Converter={StaticResource BoolToVis}}">
                         <Grid.ColumnDefinitions>
@@ -321,15 +321,15 @@
                             <Grid Margin="0,10,0,0">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,0,0">
                                     <Border Width="10" Height="10" CornerRadius="3" Background="{StaticResource Series.Cpu}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Процессор" Style="{StaticResource FaintText}" Margin="0,0,14,0"/>
+                                    <TextBlock Text="{i:L 'Процессор', 'Processor'}" Style="{StaticResource FaintText}" Margin="0,0,14,0"/>
                                     <Border Width="10" Height="10" CornerRadius="3" Background="{StaticResource Series.Gpu}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Видеокарта" Style="{StaticResource FaintText}"/>
+                                    <TextBlock Text="{i:L 'Видеокарта', 'Graphics'}" Style="{StaticResource FaintText}"/>
                                 </StackPanel>
                                 <c:AreaChart Height="110" Margin="0,18,0,0" Values="{Binding ReportCpu}" Values2="{Binding ReportGpu}" Maximum="100"
                                              Stroke="{StaticResource Series.Cpu}" Stroke2="{StaticResource Series.Gpu}" ShowGrid="True" GridBrush="{StaticResource Line}"/>
                             </Grid>
                             <StackPanel Visibility="{Binding HasReportFps, Converter={StaticResource BoolToVis}}" Margin="0,8,0,0">
-                                <TextBlock Text="FPS (когда шёл замер)" Style="{StaticResource FaintText}"/>
+                                <TextBlock Text="{i:L 'FPS (когда шёл замер)', 'FPS (while measuring)'}" Style="{StaticResource FaintText}"/>
                                 <c:AreaChart Height="60" Margin="0,4,0,0" Values="{Binding ReportFps}" Stroke="{StaticResource Violet}" MinimumScale="30"/>
                             </StackPanel>
 
@@ -352,7 +352,7 @@
                             </ItemsControl>
 
                             <StackPanel Visibility="{Binding Interferers.Count, Converter={StaticResource ZeroToVisInv}}" Margin="0,4,0,0">
-                                <TextBlock Text="КТО ОТНИМАЛ РЕСУРСЫ У ИГРЫ (В СРЕДНЕМ ЗА СЕССИЮ)" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
+                                <TextBlock Text="{i:L 'КТО ОТНИМАЛ РЕСУРСЫ У ИГРЫ (В СРЕДНЕМ ЗА СЕССИЮ)', 'WHAT TOOK RESOURCES FROM THE GAME (SESSION AVERAGE)'}" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
                                 <ItemsControl ItemsSource="{Binding Interferers}" Focusable="False">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type vm:InterfererVm}">
@@ -367,13 +367,13 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                                         <TextBlock Grid.Column="1" HorizontalAlignment="Right" Style="{StaticResource FaintText}">
-                                                            <Run Text="ЦП "/><Run Text="{Binding CpuText, Mode=OneWay}" Foreground="{StaticResource Series.Cpu}"/>
+                                                            <Run Text="{i:L 'ЦП ', 'CPU '}"/><Run Text="{Binding CpuText, Mode=OneWay}" Foreground="{StaticResource Series.Cpu}"/>
                                                         </TextBlock>
                                                         <TextBlock Grid.Column="2" HorizontalAlignment="Right" Style="{StaticResource FaintText}">
-                                                            <Run Text="ГП "/><Run Text="{Binding GpuText, Mode=OneWay}" Foreground="{StaticResource Series.Gpu}"/>
+                                                            <Run Text="{i:L 'ГП ', 'GPU '}"/><Run Text="{Binding GpuText, Mode=OneWay}" Foreground="{StaticResource Series.Gpu}"/>
                                                         </TextBlock>
                                                         <TextBlock Grid.Column="3" HorizontalAlignment="Right" Style="{StaticResource FaintText}">
-                                                            <Run Text="диск "/><Run Text="{Binding IoText, Mode=OneWay}" Foreground="{StaticResource Series.Disk}"/>
+                                                            <Run Text="{i:L 'диск ', 'disk '}"/><Run Text="{Binding IoText, Mode=OneWay}" Foreground="{StaticResource Series.Disk}"/>
                                                         </TextBlock>
                                                     </Grid>
                                                     <TextBlock Text="{Binding Advice}" Style="{StaticResource MutedText}" Margin="0,4,0,0"
@@ -386,7 +386,7 @@
                             </StackPanel>
 
                             <StackPanel Visibility="{Binding Moments.Count, Converter={StaticResource ZeroToVisInv}}" Margin="0,14,0,0">
-                                <TextBlock Text="ЗАМЕТНЫЕ МОМЕНТЫ" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
+                                <TextBlock Text="{i:L 'ЗАМЕТНЫЕ МОМЕНТЫ', 'NOTABLE MOMENTS'}" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
                                 <ItemsControl ItemsSource="{Binding Moments}" Focusable="False">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate DataType="{x:Type vm:MomentVm}">

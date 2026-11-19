@@ -24,9 +24,9 @@
                         <TextBlock Text="{Binding [lat.duration], Source={x:Static i:Loc.I}, Converter={StaticResource Upper}}" Style="{StaticResource Caption}" Margin="0,16,0,6"/>
                         <Border Background="{StaticResource PanelAlt}" CornerRadius="10" Padding="3" HorizontalAlignment="Left">
                             <StackPanel Orientation="Horizontal">
-                                <RadioButton Style="{StaticResource Segment}" GroupName="lat" Content="10 с" IsChecked="{Binding Is10, Mode=TwoWay}"/>
-                                <RadioButton Style="{StaticResource Segment}" GroupName="lat" Content="30 с" IsChecked="{Binding Is30, Mode=TwoWay}"/>
-                                <RadioButton Style="{StaticResource Segment}" GroupName="lat" Content="1 мин" IsChecked="{Binding Is60, Mode=TwoWay}"/>
+                                <RadioButton Style="{StaticResource Segment}" GroupName="lat" Content="{i:L '10 с', '10 s'}" IsChecked="{Binding Is10, Mode=TwoWay}"/>
+                                <RadioButton Style="{StaticResource Segment}" GroupName="lat" Content="{i:L '30 с', '30 s'}" IsChecked="{Binding Is30, Mode=TwoWay}"/>
+                                <RadioButton Style="{StaticResource Segment}" GroupName="lat" Content="{i:L '1 мин', '1 min'}" IsChecked="{Binding Is60, Mode=TwoWay}"/>
                             </StackPanel>
                         </Border>
                         <WrapPanel Margin="0,18,0,0">
@@ -34,7 +34,7 @@
                                 <TextBlock Text="{Binding [lat.start], Source={x:Static i:Loc.I}}" FontSize="14"/>
                             </Button>
                             <Button Style="{StaticResource BtnGhost}" Command="{Binding OpenLatencyMonCommand}" Margin="0,0,0,6" Content="LatencyMon"
-                                    ToolTip="Бесплатная программа для подробного разбора задержек (resplendence.com)"/>
+                                    ToolTip="{i:L 'Бесплатная программа для подробного разбора задержек (resplendence.com)', 'Free tool for an in-depth latency breakdown (resplendence.com)'}"/>
                         </WrapPanel>
                         <ProgressBar Height="6" Margin="0,10,0,0" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
                                      Foreground="{StaticResource AccentGradient}" Background="{StaticResource Track}" BorderThickness="0"

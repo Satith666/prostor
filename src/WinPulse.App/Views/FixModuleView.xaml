@@ -252,7 +252,7 @@
             </ItemsControl>
 
             <TextBlock Style="{StaticResource FaintText}" TextWrapping="Wrap" Margin="0,6,0,0"
-                       Text="WinPulse не отключает Защитник и службы Windows, не трогает HPET, Win32PrioritySeparation, сетевые настройки, не чистит реестр и не ставит играм приоритет «Реального времени» — у этих «твиков» нет доказанного эффекта."/>
+                       Text="{i:L 'WinPulse не отключает Защитник и службы Windows, не трогает HPET, Win32PrioritySeparation, сетевые настройки, не чистит реестр и не ставит играм приоритет «Реального времени» — у этих «твиков» нет доказанного эффекта.', 'WinPulse doesn\'t disable Defender or Windows services, doesn\'t touch HPET, Win32PrioritySeparation or network settings, doesn\'t clean the registry and never sets games to Realtime priority — these \'tweaks\' have no proven effect.'}"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

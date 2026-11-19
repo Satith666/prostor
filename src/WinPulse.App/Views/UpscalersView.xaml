@@ -22,9 +22,9 @@
                     <WrapPanel Grid.Column="1" VerticalAlignment="Top">
                         <Button Style="{StaticResource BtnPrimary}" Command="{Binding ScanCommand}" Margin="0,0,8,6" Content="{Binding [up.scan], Source={x:Static i:Loc.I}}"/>
                         <Button Style="{StaticResource Btn}" Command="{Binding OpenDlssSwapperCommand}" Margin="0,0,8,6" Content="DLSS Swapper"
-                                ToolTip="Открытый инструмент для обновления DLSS, FSR и XeSS в играх (github.com/beeradmoore/dlss-swapper)"/>
+                                ToolTip="{i:L 'Открытый инструмент для обновления DLSS, FSR и XeSS в играх (github.com/beeradmoore/dlss-swapper)', 'Open-source tool for updating DLSS, FSR and XeSS in games (github.com/beeradmoore/dlss-swapper)'}"/>
                         <Button Style="{StaticResource Btn}" Command="{Binding OpenOptiScalerCommand}" Margin="0,0,0,6" Content="OptiScaler"
-                                ToolTip="Подмена апскейлера и генерация кадров FSR 3 (github.com/optiscaler/OptiScaler). Только для одиночных игр."/>
+                                ToolTip="{i:L 'Подмена апскейлера и генерация кадров FSR 3 (github.com/optiscaler/OptiScaler). Только для одиночных игр.', 'Upscaler substitution and FSR 3 frame generation (github.com/optiscaler/OptiScaler). Single-player games only.'}"/>
                     </WrapPanel>
                 </Grid>
             </Border>

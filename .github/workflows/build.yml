@@ -91,6 +91,16 @@ jobs:
           if (Test-Path $log) { Copy-Item $log shots/winpulse.log -Force }
           Get-ChildItem shots | Format-Table Name, Length
 
+      # Те же страницы на английском — проверка, что ничего не осталось без перевода.
+      - name: Screenshots (English)
+        if: success()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force shots/en | Out-Null
+          $p = Start-Process -FilePath "dist/WinPulse.exe" -ArgumentList '--demo', '--lang', 'en', '--screenshots', "$PWD/shots/en" -PassThru
+          if (-not $p.WaitForExit(240000)) { "timeout" | Out-File shots/en/timeout.txt; $p.Kill() }
+
       # Пробный замер FPS самой программы: проверяет запуск PresentMon и формат его вывода.
       - name: PresentMon smoke test
         if: success()
@@ -142,7 +152,7 @@ jobs:
           git config user.email "winpulse-ci@users.noreply.github.com"
           $tmp = Join-Path $env:RUNNER_TEMP "shots-repo"
           New-Item -ItemType Directory -Force $tmp | Out-Null
-          Copy-Item shots/* $tmp
+          Copy-Item shots/* $tmp -Recurse
           Set-Location $tmp
           git init -q
           git checkout -q -b winpulse-shots

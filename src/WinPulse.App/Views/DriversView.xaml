@@ -24,8 +24,8 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="28,24,28,28" MaxWidth="1100" HorizontalAlignment="Stretch">
-            <TextBlock Text="Драйверы" Style="{StaticResource H1}"/>
-            <TextBlock Text="Версии и даты драйверов важных устройств. Ссылки ведут только на официальные сайты производителей и Центр обновления Windows. Сам WinPulse драйверы не скачивает и не устанавливает."
+            <TextBlock Text="{i:L 'Драйверы', 'Drivers'}" Style="{StaticResource H1}"/>
+            <TextBlock Text="{i:L 'Версии и даты драйверов важных устройств. Ссылки ведут только на официальные сайты производителей и Центр обновления Windows. Сам WinPulse драйверы не скачивает и не устанавливает.', 'Versions and dates of drivers for key devices. Links go only to official vendor sites and Windows Update. WinPulse itself never downloads or installs drivers.'}"
                        Style="{StaticResource MutedText}" Margin="0,6,0,18"/>
 
             <Border Style="{StaticResource Card}">
@@ -36,16 +36,16 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Margin="0,0,16,0">
                         <TextBlock Text="{Binding Summary}" Style="{StaticResource H2}" FontSize="17"/>
-                        <TextBlock Text="Проверяется возраст драйвера. Сравнение с последней версией на сайте производителя появится позже."
+                        <TextBlock Text="{i:L 'Проверяется возраст драйвера. Сравнение с последней версией на сайте производителя появится позже.', 'The driver\'s age is checked. Comparison with the vendor\'s latest version will come later.'}"
                                    Style="{StaticResource FaintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        <TextBlock Text="Читаю драйверы…" Foreground="{StaticResource Accent}" Margin="0,8,0,0"
+                        <TextBlock Text="{i:L 'Читаю драйверы…', 'Reading drivers…'}" Foreground="{StaticResource Accent}" Margin="0,8,0,0"
                                    Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                        <Button Style="{StaticResource BtnPrimary}" Padding="16,8" Command="{Binding OptionalUpdatesCommand}" Content="Необязательные обновления Windows"/>
+                        <Button Style="{StaticResource BtnPrimary}" Padding="16,8" Command="{Binding OptionalUpdatesCommand}" Content="{i:L 'Необязательные обновления Windows', 'Windows optional updates'}"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                            <Button Style="{StaticResource BtnGhost}" Command="{Binding RefreshCommand}" Content="Обновить"/>
-                            <Button Style="{StaticResource BtnGhost}" Command="{Binding DeviceManagerCommand}" Content="Диспетчер устройств"/>
+                            <Button Style="{StaticResource BtnGhost}" Command="{Binding RefreshCommand}" Content="{i:L 'Обновить', 'Refresh'}"/>
+                            <Button Style="{StaticResource BtnGhost}" Command="{Binding DeviceManagerCommand}" Content="{i:L 'Диспетчер устройств', 'Device Manager'}"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -54,11 +54,11 @@
             <!-- Видеодрайвер -->
             <Border Style="{StaticResource Card}" Margin="0,16,0,0" Visibility="{Binding GpuTitle, Converter={StaticResource NullToVis}}">
                 <StackPanel>
-                    <TextBlock Text="ВИДЕОДРАЙВЕР" Style="{StaticResource Caption}"/>
+                    <TextBlock Text="{i:L 'ВИДЕОДРАЙВЕР', 'GRAPHICS DRIVER'}" Style="{StaticResource Caption}"/>
                     <TextBlock Text="{Binding GpuTitle}" Style="{StaticResource H2}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     <TextBlock Text="{Binding GpuText}" Style="{StaticResource MutedText}" Margin="0,6,0,0"/>
                     <Button Style="{StaticResource BtnGhost}" HorizontalAlignment="Left" Padding="0,4" Margin="0,8,0,0"
-                            Command="{Binding ToggleStepsCommand}" Content="Как переустановить видеодрайвер начисто"/>
+                            Command="{Binding ToggleStepsCommand}" Content="{i:L 'Как переустановить видеодрайвер начисто', 'How to clean-install the graphics driver'}"/>
                     <ItemsControl ItemsSource="{Binding CleanSteps}" Visibility="{Binding ShowSteps, Converter={StaticResource BoolToVis}}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -91,7 +91,7 @@
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                                     <TextBlock Style="{StaticResource FaintText}" Margin="0,2,0,0">
                                                         <Run Text="{Binding Vendor, Mode=OneWay}"/>
-                                                        <Run Text="· драйвер от"/>
+                                                        <Run Text="{i:L '· драйвер от', '· driver dated'}"/>
                                                         <Run Text="{Binding Provider, Mode=OneWay}"/>
                                                     </TextBlock>
                                                     <TextBlock Text="{Binding Advice}" Style="{StaticResource MutedText}" FontSize="12" Margin="0,4,0,0"/>

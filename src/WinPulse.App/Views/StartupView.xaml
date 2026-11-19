@@ -5,8 +5,8 @@
              xmlns:i="clr-namespace:WinPulse.App.Infrastructure">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="28,24,28,28" MaxWidth="1100" HorizontalAlignment="Stretch">
-            <TextBlock Text="Автозагрузка" Style="{StaticResource H1}"/>
-            <TextBlock Text="Программы, которые запускаются вместе с Windows: из реестра, папок «Автозагрузка» и Планировщика заданий. Отключение работает как в Диспетчере задач — запись остаётся на месте, её можно включить обратно в любой момент."
+            <TextBlock Text="{i:L 'Автозагрузка', 'Startup'}" Style="{StaticResource H1}"/>
+            <TextBlock Text="{i:L 'Программы, которые запускаются вместе с Windows: из реестра, папок «Автозагрузка» и Планировщика заданий. Отключение работает как в Диспетчере задач — запись остаётся на месте, её можно включить обратно в любой момент.', 'Programs that start with Windows: from the registry, Startup folders and Task Scheduler. Disabling works like in Task Manager — the entry stays, and you can turn it back on any time.'}"
                        Style="{StaticResource MutedText}" Margin="0,6,0,18"/>
 
             <Border Style="{StaticResource Card}">
@@ -27,10 +27,10 @@
                         <Button Style="{StaticResource BtnPrimary}" Padding="16,8" Command="{Binding DisableRecommendedCommand}">
                             <TextBlock Text="{Binding DisableRecommendedText}"/>
                         </Button>
-                        <Button Style="{StaticResource Btn}" Margin="0,8,0,0" Command="{Binding RevertAllCommand}" Content="Вернуть всё как было"/>
+                        <Button Style="{StaticResource Btn}" Margin="0,8,0,0" Command="{Binding RevertAllCommand}" Content="{i:L 'Вернуть всё как было', 'Revert everything'}"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
-                            <Button Style="{StaticResource BtnGhost}" Command="{Binding RefreshCommand}" Content="Обновить"/>
-                            <Button Style="{StaticResource BtnGhost}" Command="{Binding OpenTaskManagerCommand}" Content="Диспетчер задач"/>
+                            <Button Style="{StaticResource BtnGhost}" Command="{Binding RefreshCommand}" Content="{i:L 'Обновить', 'Refresh'}"/>
+                            <Button Style="{StaticResource BtnGhost}" Command="{Binding OpenTaskManagerCommand}" Content="{i:L 'Диспетчер задач', 'Task Manager'}"/>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -84,8 +84,8 @@
                                 <StackPanel Grid.Column="4" VerticalAlignment="Top">
                                     <Button Style="{StaticResource Btn}" Padding="12,5" MinWidth="100" Command="{Binding ToggleCommand}" Content="{Binding ToggleLabel}"/>
                                     <Button Style="{StaticResource BtnGhost}" Padding="4,2" Margin="0,4,0,0" HorizontalAlignment="Center"
-                                            Command="{Binding OpenFolderCommand}" Content="Папка" FontSize="12"/>
-                                    <TextBlock Text="нужны права администратора" Style="{StaticResource FaintText}" FontSize="10" HorizontalAlignment="Center"
+                                            Command="{Binding OpenFolderCommand}" Content="{i:L 'Папка', 'Folder'}" FontSize="12"/>
+                                    <TextBlock Text="{i:L 'нужны права администратора', 'administrator rights required'}" Style="{StaticResource FaintText}" FontSize="10" HorizontalAlignment="Center"
                                                Visibility="{Binding NeedsAdmin, Converter={StaticResource BoolToVis}}"/>
                                 </StackPanel>
                             </Grid>
@@ -110,7 +110,7 @@
             </ItemsControl>
 
             <TextBlock Style="{StaticResource FaintText}" TextWrapping="Wrap" Margin="0,6,0,0"
-                       Text="Службы и системные задания Windows здесь не показываются и не меняются. Программы, которые сами добавляют себя в автозагрузку при каждом запуске, лучше отключать в их собственных настройках."/>
+                       Text="{i:L 'Службы и системные задания Windows здесь не показываются и не меняются. Программы, которые сами добавляют себя в автозагрузку при каждом запуске, лучше отключать в их собственных настройках.', 'Windows services and system tasks are not shown or changed here. Programs that re-add themselves to startup on every launch are best turned off in their own settings.'}"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>
