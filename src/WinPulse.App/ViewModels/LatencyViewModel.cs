@@ -16,9 +16,11 @@ public sealed class LatencyDriverVm
         Name = d.Name;
         About = LatencyAdvisor.About(d.Name);
         MaxText = LatencyAdvisor.Us(d.MaxUs);
-        Detail = Lang.T(
-            $"DPC: {d.DpcCount:N0}, макс. {LatencyAdvisor.Us(d.MaxDpcUs)} · ISR: {d.IsrCount:N0}, макс. {LatencyAdvisor.Us(d.MaxIsrUs)}" + (d.Over1000 > 0 ? $" · дольше 1 мс: {d.Over1000:N0} раз" : ""),
-            $"DPC: {d.DpcCount:N0}, max {LatencyAdvisor.Us(d.MaxDpcUs)} · ISR: {d.IsrCount:N0}, max {LatencyAdvisor.Us(d.MaxIsrUs)}" + (d.Over1000 > 0 ? $" · over 1 ms: {d.Over1000:N0} times" : ""));
+        var parts = new List<string>();
+        if (d.DpcCount > 0) parts.Add(Lang.T($"DPC: {d.DpcCount:N0}, макс. {LatencyAdvisor.Us(d.MaxDpcUs)}", $"DPC: {d.DpcCount:N0}, max {LatencyAdvisor.Us(d.MaxDpcUs)}"));
+        if (d.IsrCount > 0) parts.Add(Lang.T($"ISR: {d.IsrCount:N0}, макс. {LatencyAdvisor.Us(d.MaxIsrUs)}", $"ISR: {d.IsrCount:N0}, max {LatencyAdvisor.Us(d.MaxIsrUs)}"));
+        if (d.Over1000 > 0) parts.Add(Lang.T($"дольше 1 мс: {d.Over1000:N0} раз", $"over 1 ms: {d.Over1000:N0} times"));
+        Detail = string.Join(" · ", parts);
         BarWidth = 4 + 236 * Math.Min(1, d.MaxUs / scaleUs);
         Brush = res(LatencyAdvisor.Level(d.MaxUs) switch { LatencyLevel.Bad => "Bad", LatencyLevel.Warn => "Warn", _ => "Good" });
     }
