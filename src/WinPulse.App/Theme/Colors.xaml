@@ -49,7 +49,7 @@
         <GradientStop Color="#3322D3EE" Offset="0"/>
         <GradientStop Color="#0A22D3EE" Offset="1"/>
     </LinearGradientBrush>
-    <LinearGradientBrush x:Key="FeatureCard" StartPoint="0,0" EndPoint="1,1">
+    <LinearGradientBrush x:Key="FeatureCardBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#388B5CF6" Offset="0"/>
         <GradientStop Color="#1A22D3EE" Offset="1"/>
     </LinearGradientBrush>

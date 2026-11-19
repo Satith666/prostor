@@ -18,6 +18,8 @@ public partial class App : Application
     private MainViewModel? _vm;
     /// <summary>Режим снимков экрана для сборки на GitHub: без окон с сообщениями.</summary>
     private bool _headless;
+    private string? _lastErrorMessage;
+    private DateTime _lastErrorShown;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -176,6 +178,16 @@ public partial class App : Application
             e.Handled = true;
             return;
         }
+
+        // Ошибка при отрисовке повторяется на каждом кадре — не заваливаем пользователя одинаковыми окнами.
+        string message = e.Exception.Message;
+        if (message == _lastErrorMessage && DateTime.UtcNow - _lastErrorShown < TimeSpan.FromMinutes(1))
+        {
+            e.Handled = true;
+            return;
+        }
+        _lastErrorMessage = message;
+        _lastErrorShown = DateTime.UtcNow;
         MessageBox.Show(
             "Произошла ошибка. Она записана в журнал, программа продолжит работу.\n\n" + e.Exception.Message +
             "\n\nЖурнал: " + Log.FilePath,
