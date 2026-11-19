@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -123,7 +124,9 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 		// the reference: every file asked for its own size on disk (the folder
 		// listing keeps outdated sizes for files Windows compressed later)
 		start := time.Now()
-		tFiles, tSize, lSize, denied := trueFolderSize(sr, 10*time.Minute)
+		cmp := &recCompare{recs: a.mftRecs}
+		tFiles, tSize, lSize, denied := trueFolderSize(sr, 10*time.Minute, cmp)
+		a.mftRecs = nil
 		if denied < 0 {
 			return warnf("обход папки Windows не закончился за 10 минут")
 		}
@@ -131,6 +134,7 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 		ds := pctDiff(mSize, tSize)
 		msg := fmt.Sprintf("MFT: %d файлов, %s; обход с размером от каждого файла: %d файлов, %s (по списку папок %s, папок без доступа %d) — расхождение %.2f%% по числу и %.2f%% по размеру, обход занял %s",
 			mFiles, human(mSize), tFiles, human(tSize), human(lSize), denied, df, ds, secRu(time.Since(start).Seconds()))
+		msg += ". " + cmp.report()
 		if df > 1 || ds > 1 {
 			return failf("%s, допустимо до 1%%", msg)
 		}
@@ -138,10 +142,100 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 	})
 }
 
+// recCompare compares each file's size from its own handle with its MFT
+// record from the drive scan, grouped by what kind of file it is.
+type recCompare struct {
+	recs  []ntfs.Rec
+	kinds map[string]*[3]int64 // files, handle bytes, MFT bytes
+	worst []recDiff
+}
+
+type recDiff struct {
+	path      string
+	file, mft int64
+	kind      string
+}
+
+func (c *recCompare) add(path string, e winapi.DirEnt, handleAlloc int64) {
+	if c == nil || len(c.recs) == 0 {
+		return
+	}
+	id := e.ID & 0xFFFFFFFFFFFF
+	if id >= uint64(len(c.recs)) {
+		return
+	}
+	r := c.recs[id]
+	var kind string
+	switch {
+	case r.WOF:
+		kind = "сжатые Windows"
+	case e.Attr&0x800 != 0:
+		kind = "сжатые NTFS"
+	case e.Attr&0x200 != 0:
+		kind = "разреженные"
+	case e.Tag != 0:
+		kind = fmt.Sprintf("точка повторной обработки %#x", e.Tag)
+	case r.Links > 1:
+		kind = "с жёсткими ссылками"
+	case r.Name == "":
+		kind = "запись не найдена"
+	default:
+		kind = "обычные"
+	}
+	if c.kinds == nil {
+		c.kinds = map[string]*[3]int64{}
+	}
+	k := c.kinds[kind]
+	if k == nil {
+		k = &[3]int64{}
+		c.kinds[kind] = k
+	}
+	k[0]++
+	k[1] += handleAlloc
+	k[2] += r.Alloc
+	if handleAlloc != r.Alloc {
+		c.worst = append(c.worst, recDiff{path, handleAlloc, r.Alloc, kind})
+		sort.Slice(c.worst, func(i, j int) bool {
+			return abs64(c.worst[i].file-c.worst[i].mft) > abs64(c.worst[j].file-c.worst[j].mft)
+		})
+		if len(c.worst) > 6 {
+			c.worst = c.worst[:6]
+		}
+	}
+}
+
+func (c *recCompare) report() string {
+	if c == nil || len(c.kinds) == 0 {
+		return "сравнение по файлам недоступно"
+	}
+	var parts []string
+	for k, v := range c.kinds {
+		if v[1] != v[2] {
+			parts = append(parts, fmt.Sprintf("%s: %d файлов, файл %s / MFT %s", k, v[0], human(v[1]), human(v[2])))
+		}
+	}
+	sort.Strings(parts)
+	var ws []string
+	for _, w := range c.worst {
+		ws = append(ws, fmt.Sprintf("%s (%s) %d/%d", w.path, w.kind, w.file, w.mft))
+	}
+	if len(parts) == 0 {
+		return "по каждому файлу размер из MFT совпадает с размером от самого файла"
+	}
+	return "Расходятся: " + strings.Join(parts, "; ") + ". Больше всего: " + strings.Join(ws, "; ")
+}
+
+func abs64(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
 // trueFolderSize walks a folder, counts every file once (hard links by file
 // id, as the MFT does) and takes each file's size on disk from the file
 // itself. lSize is the same by the folder listing. denied < 0: time ran out.
-func trueFolderSize(root string, limit time.Duration) (files, size, lSize int64, denied int) {
+func trueFolderSize(root string, limit time.Duration, cmp *recCompare) (files, size, lSize int64, denied int) {
 	deadline := time.Now().Add(limit)
 	seen := map[uint64]bool{}
 	stack := []string{root}
@@ -171,11 +265,12 @@ func trueFolderSize(root string, limit time.Duration) (files, size, lSize int64,
 				}
 				files++
 				lSize += e.Alloc
-				if al, _, err := winapi.FileAlloc(p); err == nil {
-					size += al
-				} else {
-					size += e.Alloc
+				al, _, err := winapi.FileAlloc(p)
+				if err != nil {
+					al = e.Alloc
 				}
+				size += al
+				cmp.add(p, e, al)
 			}
 		}
 	}

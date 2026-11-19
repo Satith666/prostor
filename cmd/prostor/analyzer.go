@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"prostor/internal/ntfs"
 	"prostor/internal/winapi"
 )
 
@@ -89,6 +90,8 @@ type Analysis struct {
 	took   float64
 	method string // "mft" — read from the NTFS file table, "walk" — folder by folder
 	snapID string // snapshot saved after this analysis
+
+	mftRecs []ntfs.Rec // kept only for the self-test
 }
 
 type linkShard struct {

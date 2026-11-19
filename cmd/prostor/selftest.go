@@ -802,6 +802,8 @@ func (t *selfTest) analyzerChecks() {
 		j := newTestJob()
 		timer := time.AfterFunc(15*time.Minute, j.Cancel)
 		defer timer.Stop()
+		keepMFTRecs = true
+		defer func() { keepMFTRecs = false }()
 		a := newAnalysis(normalizeRoot(d.Root), j)
 		stop := make(chan struct{})
 		go func() { // прогресс в консоли

@@ -18,6 +18,9 @@ import (
 	"prostor/internal/winapi"
 )
 
+// keepMFTRecs (self-test): keep every file record after the analysis.
+var keepMFTRecs bool
+
 // mftPossible: Windows, administrator, a whole NTFS drive.
 func (a *Analysis) mftPossible() bool {
 	if !winapi.IsWindows || !isAdmin || !a.isDrive || os.Getenv("PROSTOR_NO_MFT") == "1" {
@@ -52,6 +55,9 @@ func (a *Analysis) runMFT() error {
 	}
 	a.job.SetPhase("Подсчёт размеров")
 	a.buildFromMFT(recs)
+	if keepMFTRecs {
+		a.mftRecs = recs // self-test compares files one by one
+	}
 	recs = nil
 	debug.FreeOSMemory()
 	return nil
