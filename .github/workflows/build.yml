@@ -44,7 +44,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force shots | Out-Null
-          $p = Start-Process -FilePath "dist/WinPulse.exe" -ArgumentList '--demo', '--screenshots', "$PWD/shots" -PassThru
+          $p = Start-Process -FilePath "dist/WinPulse.exe" -ArgumentList '--demo', '--lang', 'ru', '--screenshots', "$PWD/shots" -PassThru
           if (-not $p.WaitForExit(240000)) {
             "timeout" | Out-File shots/timeout.txt
             # Снимок всего экрана: виден ли модальный диалог или окно вообще

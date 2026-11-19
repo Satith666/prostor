@@ -46,6 +46,9 @@ public partial class App : Application
 
         var settings = AppSettings.Load();
         Lang.English = settings.Language == "en";
+        // --lang ru|en — язык только на этот запуск (для снимков экрана), настройки не меняются.
+        int langIndex = Array.FindIndex(args, a => a.Equals("--lang", StringComparison.OrdinalIgnoreCase));
+        if (langIndex >= 0 && langIndex + 1 < args.Length) Lang.English = args[langIndex + 1].Equals("en", StringComparison.OrdinalIgnoreCase);
         bool demo = args.Any(a => a.Equals("--demo", StringComparison.OrdinalIgnoreCase));
         int shotsIndex = Array.FindIndex(args, a => a.Equals("--screenshots", StringComparison.OrdinalIgnoreCase));
         string? shotsDir = shotsIndex >= 0 && shotsIndex + 1 < args.Length ? args[shotsIndex + 1] : null;

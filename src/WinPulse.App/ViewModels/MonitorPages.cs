@@ -62,8 +62,12 @@ public sealed class KpiVm : ObservableObject
         }
     }
     public string PercentText => double.IsNaN(_percent) ? "—" : Math.Round(_percent).ToString("0");
-    /// <summary>Крупная строка рядом с датчиком: частота, «9,8 из 16 ГБ», имя видеокарты.</summary>
+    /// <summary>Крупная строка рядом с датчиком: частота, «9,8 / 16 ГБ», имя видеокарты.</summary>
     public string Main { get => _main; set => Set(ref _main, value); }
+
+    private string _short = "";
+    /// <summary>Короткая подпись под крупной строкой на датчике.</summary>
+    public string Short { get => _short; set => Set(ref _short, value); }
 }
 
 public sealed class VerdictVm : ObservableObject
@@ -171,6 +175,7 @@ public sealed class OverviewViewModel : PageViewModel
         Cpu.Value = Ru.Percent(raw.Cpu.UtilityPercent);
         Cpu.Percent = raw.Cpu.UtilityPercent;
         Cpu.Main = raw.Cpu.EffectiveMHz is double cpuMhz ? Ru.GHz(cpuMhz) : Ru.Percent(raw.Cpu.UtilityPercent);
+        Cpu.Short = Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
         Cpu.Sub = raw.Cpu.EffectiveMHz is double mhz ? Ru.GHz(mhz) + " · " + Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов")
             : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
         Cpu.Spark = HistorySnapshot.Tail(h.Cpu, 60);
@@ -178,7 +183,8 @@ public sealed class OverviewViewModel : PageViewModel
         Memory.Value = Ru.Percent(raw.Memory.UsedPercent);
         Memory.Sub = $"{Ru.Bytes(f.Memory.InUse)} из {Ru.Bytes(f.Memory.Total)}";
         Memory.Percent = raw.Memory.UsedPercent;
-        Memory.Main = Memory.Sub;
+        Memory.Main = UsedOfTotal(f.Memory.InUse, f.Memory.Total);
+        Memory.Short = "свободно " + Ru.Bytes(Math.Max(0, f.Memory.Total - f.Memory.InUse));
         Memory.Spark = HistorySnapshot.Tail(h.MemPercent, 60);
 
         var busiest = raw.Disks.OrderByDescending(d => d.ActivePercent).FirstOrDefault();
@@ -188,6 +194,7 @@ public sealed class OverviewViewModel : PageViewModel
             Disk.Sub = $"{VerdictRules.DiskName(busiest)} · {Ru.Rate(busiest.ReadBps + busiest.WriteBps)}";
             Disk.Percent = busiest.ActivePercent;
             Disk.Main = Ru.Rate(busiest.ReadBps + busiest.WriteBps);
+            Disk.Short = VerdictRules.DiskName(busiest);
             Disk.Spark = h.Disks.TryGetValue(busiest.Index, out var dh) ? HistorySnapshot.Tail(dh.Active, 60) : [];
         }
         else
@@ -196,6 +203,7 @@ public sealed class OverviewViewModel : PageViewModel
             Disk.Sub = "нет данных";
             Disk.Percent = 0;
             Disk.Main = "—";
+            Disk.Short = "нет данных";
         }
 
         var gpu = raw.Gpus.OrderByDescending(g => g.UtilPercent).FirstOrDefault();
@@ -205,6 +213,7 @@ public sealed class OverviewViewModel : PageViewModel
             Gpu.Sub = gpu.DedicatedTotal > 0 ? $"видеопамять {Ru.Bytes(gpu.DedicatedUsed)} из {Ru.Bytes(gpu.DedicatedTotal)}" : gpu.Name;
             Gpu.Percent = gpu.UtilPercent;
             Gpu.Main = ShortGpuName(gpu.Name);
+            Gpu.Short = gpu.DedicatedTotal > 0 ? "VRAM " + UsedOfTotal(gpu.DedicatedUsed, gpu.DedicatedTotal) : "";
             Gpu.Spark = HistorySnapshot.Tail(h.GpuUtil, 60);
         }
         else
@@ -213,6 +222,7 @@ public sealed class OverviewViewModel : PageViewModel
             Gpu.Sub = "нет данных";
             Gpu.Percent = 0;
             Gpu.Main = "—";
+            Gpu.Short = "нет данных";
         }
 
         double rx = raw.Network.Sum(n => n.ReceiveBps), tx = raw.Network.Sum(n => n.SendBps);
@@ -239,6 +249,15 @@ public sealed class OverviewViewModel : PageViewModel
             });
 
         Table.Update(f.Apps, raw.Memory.TotalPhysical);
+    }
+
+    /// <summary>«12,4 / 16 ГБ» — компактно для карточки датчика.</summary>
+    private static string UsedOfTotal(double used, double total)
+    {
+        var ru = System.Globalization.CultureInfo.GetCultureInfo("ru-RU");
+        const double Gb = 1024d * 1024 * 1024;
+        if (total < Gb) return $"{Ru.Bytes((long)used)} / {Ru.Bytes((long)total)}";
+        return string.Format(ru, "{0:0.0} / {1:0.#} ГБ", used / Gb, total / Gb);
     }
 
     /// <summary>«NVIDIA GeForce RTX 3050» → «RTX 3050»: на датчике мало места.</summary>

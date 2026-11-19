@@ -93,18 +93,18 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Grid Width="96" Height="96">
-                                    <c:RingGauge Value="{Binding Percent}" RingBrush="{Binding Brush}" Thickness="9"/>
+                                <Grid Width="84" Height="84">
+                                    <c:RingGauge Value="{Binding Percent}" RingBrush="{Binding Brush}" Thickness="8"/>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding PercentText}" FontFamily="{StaticResource DisplayFont}" FontSize="26" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding PercentText}" FontFamily="{StaticResource DisplayFont}" FontSize="23" FontWeight="Bold"/>
                                         <TextBlock Text="%" FontSize="13" Foreground="{StaticResource Faint}" VerticalAlignment="Bottom" Margin="1,0,0,4"/>
                                     </StackPanel>
                                 </Grid>
-                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" ToolTip="{Binding Sub}">
                                     <TextBlock Text="{Binding Title, Converter={StaticResource Upper}}" Style="{StaticResource Caption}"/>
-                                    <TextBlock Text="{Binding Main}" FontFamily="{StaticResource DisplayFont}" FontSize="17" FontWeight="SemiBold"
+                                    <TextBlock Text="{Binding Main}" FontFamily="{StaticResource DisplayFont}" FontSize="16" FontWeight="SemiBold"
                                                Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Sub}" Style="{StaticResource FaintText}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Short}" Style="{StaticResource FaintText}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </Grid>
                         </Button>
