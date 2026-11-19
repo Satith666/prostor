@@ -57,9 +57,14 @@ switch ($Step) {
         $info = Invoke-RestMethod -Uri "$base/api/info" -Headers @{ 'X-Token' = $tok }
         Write-Host "admin=$($info.admin) helper=$($info.helper)"
         Invoke-RestMethod -Method Post -Uri "$base/api/clean/scan" -Headers @{ 'X-Token' = $tok } -ContentType 'application/json' -Body '{"IDs":["win_temp","wu_cache"]}' | Out-Null
-        Start-Sleep 3
-        $job = Invoke-RestMethod -Uri "$base/api/job?kind=scan" -Headers @{ 'X-Token' = $tok }
-        Write-Host "scan via helper: running=$($job.running) bytes=$($job.bytes)"
+        $job = $null
+        for ($i = 0; $i -lt 120; $i++) {
+            Start-Sleep -Milliseconds 500
+            $job = Invoke-RestMethod -Uri "$base/api/job?kind=scan" -Headers @{ 'X-Token' = $tok }
+            if ($job.exists -and -not $job.running) { break }
+        }
+        foreach ($it in $job.result) { Write-Host "поиск через помощника: $($it.id) found=$($it.found) size=$($it.size) files=$($it.files)" }
+        $scanOK = $job.exists -and -not $job.running -and -not $job.err -and @($job.result).Count -ge 1
         $p.Kill()
         $left = $null
         for ($i = 0; $i -lt 40; $i++) {
@@ -70,6 +75,7 @@ switch ($Step) {
         Write-Host "помощник завершился через $i с"
         LogTail
         if (-not ($info.admin -and $info.helper)) { throw "помощник не подключился" }
+        if (-not $scanOK) { throw "поиск через помощника не завершился: $($job | ConvertTo-Json -Depth 4 -Compress)" }
         if ($left) { throw "помощник не завершился вместе с окном" }
     }
     'selftest' {
