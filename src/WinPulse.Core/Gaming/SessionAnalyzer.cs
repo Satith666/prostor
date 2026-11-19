@@ -19,6 +19,8 @@ public sealed class SessionReport
     public double PeakMemPercent { get; init; }
     public double? AvgFps { get; init; }
     public double? LowFps { get; init; }
+    public double? PeakCpuTemp { get; init; }
+    public double? PeakGpuTemp { get; init; }
     public IReadOnlyList<SessionFinding> Findings { get; init; } = [];
     public IReadOnlyList<Interferer> Interferers { get; init; } = [];
     public IReadOnlyList<SessionMoment> Moments { get; init; } = [];
@@ -105,6 +107,9 @@ public static class SessionAnalyzer
                     " The game waits for data at those moments — you see it as freezes.")));
         }
 
+        // Перегрев
+        var (peakGpu, peakCpu) = Thermal(r, s, findings);
+
         if (avgFps is double a && lowFps is double low && low < a * 0.6)
             findings.Add(new("warn", Lang.T("Кадры заметно проседали", "Frame rate dipped noticeably"),
                 Lang.T($"В среднем {a:0} FPS, но в худшие секунды — {low:0}. Посмотрите моменты ниже: что происходило в системе, когда FPS падал.",
@@ -123,6 +128,8 @@ public static class SessionAnalyzer
             PeakMemPercent = peakMem,
             AvgFps = avgFps,
             LowFps = lowFps,
+            PeakCpuTemp = peakCpu,
+            PeakGpuTemp = peakGpu,
             Findings = findings,
             Interferers = interferers,
             Moments = moments,
@@ -131,6 +138,46 @@ public static class SessionAnalyzer
             FpsSeries = Downsample(s.Select(x => x.Fps ?? 0).ToArray(), 600),
             Headline = headline,
         };
+    }
+
+    /// <summary>
+    /// Перегрев: 95-й перцентиль температуры (чтобы единичный выброс датчика не считался).
+    /// Для видеокарты дополнительно — насколько падала частота в горячие секунды по сравнению с прохладными.
+    /// </summary>
+    private static (double? PeakGpu, double? PeakCpu) Thermal(GameSessionRecord r, List<SessionSample> s, List<SessionFinding> findings)
+    {
+        double? peakGpu = null, peakCpu = null;
+        var gpu = s.Where(x => x.GpuTemp is not null).ToList();
+        if (gpu.Count >= 30)
+        {
+            var temps = gpu.Select(x => x.GpuTemp!.Value).OrderBy(v => v).ToArray();
+            peakGpu = temps[^1];
+            double p95 = FrameStats.Percentile(temps, 95);
+            if (p95 >= 85)
+            {
+                var hot = gpu.Where(x => x.GpuTemp >= p95 - 2 && x.GpuClock is > 0).Select(x => x.GpuClock!.Value).ToList();
+                var cool = gpu.Where(x => x.GpuTemp < p95 - 8 && x.GpuClock is > 0 && x.Gpu >= 80).Select(x => x.GpuClock!.Value).ToList();
+                double drop = hot.Count >= 10 && cool.Count >= 10 ? (cool.Average() - hot.Average()) * 100 / cool.Average() : 0;
+                findings.Add(new("warn", Lang.T("Видеокарта перегревалась", "The GPU ran hot"),
+                    Lang.T($"Температура доходила до {peakGpu:0} °C" + (drop >= 4 ? $", и в горячие моменты частота падала на {drop:0}% — это прямые потери FPS." : ".") +
+                           " Почистите радиатор и вентиляторы от пыли, проверьте продув корпуса. Можно поднять обороты вентиляторов (MSI Afterburner) — частота станет стабильнее.",
+                        $"Temperature reached {peakGpu:0} °C" + (drop >= 4 ? $", and at hot moments the clock dropped by {drop:0}% — a direct FPS loss." : ".") +
+                        " Clean dust from the heatsink and fans, check case airflow. A more aggressive fan curve (MSI Afterburner) keeps clocks steadier.")));
+            }
+        }
+
+        var cpu = s.Where(x => x.CpuTemp is not null).Select(x => x.CpuTemp!.Value).OrderBy(v => v).ToArray();
+        if (cpu.Length >= 30)
+        {
+            peakCpu = cpu[^1];
+            double p95 = FrameStats.Percentile(cpu, 95);
+            double limit = r.CpuName.Contains("AMD", StringComparison.OrdinalIgnoreCase) ? 90 : 95;
+            if (p95 >= limit)
+                findings.Add(new("warn", Lang.T("Процессор работал у предельной температуры", "The CPU ran at its temperature limit"),
+                    Lang.T($"До {peakCpu:0} °C — при такой температуре процессор сам снижает частоту. Проверьте кулер: крепление, пыль, термопасту (если ей больше 3–4 лет).",
+                        $"Up to {peakCpu:0} °C — at this point the CPU lowers its own clocks. Check the cooler: mounting, dust, thermal paste (if older than 3–4 years).")));
+        }
+        return (peakGpu, peakCpu);
     }
 
     private static List<Interferer> Interferers(List<SessionSample> s)

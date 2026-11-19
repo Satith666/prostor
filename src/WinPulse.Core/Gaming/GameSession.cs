@@ -30,6 +30,9 @@ public sealed class SessionSample
     public double GameIo { get; set; }
     /// <summary>FPS за эту секунду, если в это время шёл замер.</summary>
     public double? Fps { get; set; }
+    public double? CpuTemp { get; set; }
+    public double? GpuTemp { get; set; }
+    public double? GpuClock { get; set; }
     /// <summary>Самые заметные сторонние программы в эту секунду.</summary>
     public List<SessionApp> Others { get; set; } = new();
 }
@@ -183,6 +186,9 @@ public sealed class GameSessionTracker
             GameMemory = game.PrivateMemory,
             GameIo = Math.Round(game.IoBps),
             Fps = fps is double v ? Math.Round(v, 1) : null,
+            CpuTemp = f.Sensors?.CpuTemp,
+            GpuTemp = f.Sensors?.GpuTemp,
+            GpuClock = f.Sensors?.GpuClockMHz,
             Others = others.Select(o => new SessionApp
             {
                 Name = o.DisplayName,

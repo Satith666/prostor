@@ -13,6 +13,7 @@ public sealed class MonitorFrame
     public required IReadOnlyList<Verdict> Verdicts { get; init; }
     public required SystemInfo Info { get; init; }
     public bool IsDemo { get; init; }
+    public SensorSnapshot? Sensors { get; init; }
 }
 
 /// <summary>Замер → скорости → приложения → история → выводы.</summary>
@@ -50,7 +51,21 @@ public sealed class MonitorEngine : IDisposable
             Verdicts = verdicts,
             Info = _source.Info,
             IsDemo = _source.IsDemo,
+            Sensors = ReadSensors(),
         };
+    }
+
+    private SensorSnapshot? ReadSensors()
+    {
+        try
+        {
+            return _source.ReadSensors();
+        }
+        catch (Exception ex)
+        {
+            Diag.Report("sensors", ex);
+            return null;
+        }
     }
 
     public void Dispose() => _source.Dispose();

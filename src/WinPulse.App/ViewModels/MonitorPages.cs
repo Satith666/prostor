@@ -177,7 +177,9 @@ public sealed class OverviewViewModel : PageViewModel
         Cpu.Value = Ru.Percent(raw.Cpu.UtilityPercent);
         Cpu.Percent = raw.Cpu.UtilityPercent;
         Cpu.Main = raw.Cpu.EffectiveMHz is double cpuMhz ? Ru.GHz(cpuMhz) : Ru.Percent(raw.Cpu.UtilityPercent);
-        Cpu.Short = Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
+        Cpu.Short = f.Sensors?.CpuTemp is double cpuTemp
+            ? $"{cpuTemp:0} °C · {Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов")}"
+            : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
         Cpu.Sub = raw.Cpu.EffectiveMHz is double mhz ? Ru.GHz(mhz) + " · " + Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов")
             : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
         Cpu.Spark = HistorySnapshot.Tail(h.Cpu, 60);
@@ -215,7 +217,8 @@ public sealed class OverviewViewModel : PageViewModel
             Gpu.Sub = gpu.DedicatedTotal > 0 ? $"видеопамять {Ru.Bytes(gpu.DedicatedUsed)} из {Ru.Bytes(gpu.DedicatedTotal)}" : gpu.Name;
             Gpu.Percent = gpu.UtilPercent;
             Gpu.Main = ShortGpuName(gpu.Name);
-            Gpu.Short = gpu.DedicatedTotal > 0 ? "VRAM " + UsedOfTotal(gpu.DedicatedUsed, gpu.DedicatedTotal) : "";
+            string vram = gpu.DedicatedTotal > 0 ? UsedOfTotal(gpu.DedicatedUsed, gpu.DedicatedTotal) : "";
+            Gpu.Short = f.Sensors?.GpuTemp is double gpuTemp ? $"{gpuTemp:0} °C · {vram}" : vram.Length > 0 ? "VRAM " + vram : "";
             Gpu.Spark = HistorySnapshot.Tail(h.GpuUtil, 60);
         }
         else
@@ -300,7 +303,9 @@ public sealed class CpuViewModel : PageViewModel
         Threads = new StatVm("Потоки");
         Handles = new StatVm("Дескрипторы", "Открытые программами файлы, ключи реестра и другие объекты.");
         Uptime = new StatVm("Работает без перезагрузки");
-        Stats = new[] { Speed, BaseSpeed, Processes, Threads, Handles, Uptime };
+        Temperature = new StatVm("Температура", "Самый горячий датчик процессора (Package или Tctl/Tdie).");
+        Power = new StatVm("Мощность", "Потребление процессора по его собственному датчику.");
+        Stats = new[] { Speed, BaseSpeed, Temperature, Power, Processes, Threads, Handles, Uptime };
         Table = new AppTableViewModel("cpu");
     }
 
@@ -316,6 +321,8 @@ public sealed class CpuViewModel : PageViewModel
     public StatVm Threads { get; }
     public StatVm Handles { get; }
     public StatVm Uptime { get; }
+    public StatVm Temperature { get; }
+    public StatVm Power { get; }
     public IReadOnlyList<StatVm> Stats { get; }
     public AppTableViewModel Table { get; }
 
@@ -331,6 +338,9 @@ public sealed class CpuViewModel : PageViewModel
         Threads.Value = c.ThreadCount.ToString("N0", Ru.Culture);
         Handles.Value = c.HandleCount.ToString("N0", Ru.Culture);
         Uptime.Value = Ru.Duration(c.Uptime);
+        var sensors = f.Sensors;
+        Temperature.Value = sensors?.CpuTemp is double t ? $"{t:0} °C" : sensors?.CpuNeedsDriver == true ? "нужен PawnIO" : "—";
+        Power.Value = sensors?.CpuPower is double w ? $"{w:0} Вт" : "—";
         var v = f.Verdicts.FirstOrDefault(x => x.Area == "cpu");
         Verdict = v?.Title ?? "";
         VerdictDetail = v?.Detail ?? "";
@@ -562,6 +572,10 @@ public sealed class GpuViewModel : PageViewModel
     public string Verdict { get => _verdict; private set => Set(ref _verdict, value); }
     public string VerdictDetail { get => _verdictDetail; private set => Set(ref _verdictDetail, value); }
 
+    private string _sensorText = "";
+    /// <summary>«68 °C (горячая точка 80 °C) · 112 Вт · 1845 МГц · вентиляторы 54%».</summary>
+    public string SensorText { get => _sensorText; private set => Set(ref _sensorText, value); }
+
     private static string EngineName(string e) => e switch
     {
         "3D" => "3D",
@@ -589,6 +603,14 @@ public sealed class GpuViewModel : PageViewModel
                 .Select(kv => new EngineVm { Name = EngineName(kv.Key), Value = Ru.Percent(kv.Value), Fraction = kv.Value / 100 })
                 .ToList();
         });
+
+        var sn = f.Sensors;
+        var parts = new List<string>();
+        if (sn?.GpuTemp is double gt) parts.Add(sn.GpuHotspot is double hs ? $"{gt:0} °C (горячая точка {hs:0} °C)" : $"{gt:0} °C");
+        if (sn?.GpuPower is double gp) parts.Add($"{gp:0} Вт");
+        if (sn?.GpuClockMHz is double gc) parts.Add($"{gc:0} МГц");
+        if (sn?.GpuFanPercent is double fan) parts.Add($"вентиляторы {fan:0}%");
+        SensorText = parts.Count == 0 ? "" : "Датчики: " + string.Join(" · ", parts);
 
         var v = f.Verdicts.FirstOrDefault(x => x.Area == "gpu");
         Verdict = v?.Title ?? "";

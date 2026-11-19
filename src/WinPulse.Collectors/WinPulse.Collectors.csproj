@@ -10,4 +10,11 @@
     <ProjectReference Include="..\WinPulse.Core\WinPulse.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Датчики: LibreHardwareMonitor (MPL-2.0). Датчики процессора — только если установлен драйвер PawnIO. -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.*" />
+    <!-- Настройки драйвера NVIDIA (DRS): NvAPIWrapper (LGPL-3.0). -->
+    <PackageReference Include="NvAPIWrapper.Net" Version="0.8.*" />
+  </ItemGroup>
+
 </Project>

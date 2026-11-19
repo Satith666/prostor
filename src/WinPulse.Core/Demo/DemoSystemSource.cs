@@ -335,5 +335,21 @@ public sealed class DemoSystemSource : ISystemSource
         return p is null ? new AppIdentity(null, null, null) : new AppIdentity(p.Path, p.Description, p.Company);
     }
 
+    /// <summary>Правдоподобные датчики для демо: игра нагружает видеокарту, температуры «дышат».</summary>
+    public SensorSnapshot? ReadSensors()
+    {
+        double t = (DateTime.Now - DateTime.Today).TotalSeconds;
+        return new SensorSnapshot
+        {
+            CpuTemp = 62 + 4 * Math.Sin(t / 23),
+            CpuPower = 58 + 9 * Math.Sin(t / 17),
+            GpuTemp = 68 + 3 * Math.Sin(t / 31),
+            GpuHotspot = 80 + 3 * Math.Sin(t / 31),
+            GpuPower = 112 + 6 * Math.Sin(t / 13),
+            GpuClockMHz = 1845 + 30 * Math.Sin(t / 19),
+            GpuFanPercent = 54 + 4 * Math.Sin(t / 29),
+        };
+    }
+
     public void Dispose() { }
 }

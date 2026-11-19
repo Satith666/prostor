@@ -113,6 +113,30 @@ jobs:
             Write-Output "::warning title=PresentMon smoke::no csv. $console"
           }
 
+      # Справка по API NvAPIWrapper (типы DRS и идентификаторы настроек) — кладётся рядом со снимками.
+      - name: Dump NvAPIWrapper API
+        if: success()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem "$env:USERPROFILE/.nuget/packages/nvapiwrapper.net" -Recurse -Filter NvAPIWrapper.dll |
+            Where-Object { $_.FullName -match 'netstandard2' } | Select-Object -First 1
+          if (-not $dll) { $dll = Get-ChildItem "$env:USERPROFILE/.nuget/packages/nvapiwrapper.net" -Recurse -Filter NvAPIWrapper.dll | Select-Object -First 1 }
+          $out = New-Object System.Collections.Generic.List[string]
+          $out.Add("dll: $($dll.FullName)")
+          $asm = [Reflection.Assembly]::LoadFrom($dll.FullName)
+          $types = try { $asm.GetExportedTypes() } catch { $_.Exception.Types | Where-Object { $_ } }
+          foreach ($t in $types | Where-Object { $_.Namespace -like 'NvAPIWrapper.DRS*' -or $_.Name -eq 'NVIDIA' -or $_.Name -like '*SettingId*' -or $_.Name -like 'DriverSettings*' }) {
+            $out.Add("TYPE $($t.FullName)")
+            if ($t.IsEnum) {
+              foreach ($n in [Enum]::GetNames($t)) { $out.Add(("  {0} = 0x{1:X8}" -f $n, [Convert]::ToUInt32([Enum]::Parse($t, $n)))) }
+              continue
+            }
+            foreach ($m in $t.GetMembers([Reflection.BindingFlags]'Public,Instance,Static,DeclaredOnly')) { $out.Add("  $($m.MemberType) $m") }
+          }
+          $out | Out-File shots/nvapi-api.txt -Encoding utf8
+          Write-Output "::notice title=NvAPIWrapper::$($out.Count) lines"
+
       - name: Publish screenshots to branch winpulse-shots
         if: success() && github.event_name == 'push'
         shell: pwsh

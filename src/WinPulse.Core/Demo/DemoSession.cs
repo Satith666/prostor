@@ -48,6 +48,10 @@ public static class DemoSession
                 GameGpu = 82 + rnd.NextDouble() * 4,
                 GameMemory = 5500L << 20,
                 Fps = Math.Round(fps, 1),
+                CpuTemp = Math.Round(64 + 5 * Math.Sin(t / 90.0) + rnd.NextDouble() * 2, 1),
+                // К середине игры видеокарта прогревается до 86–88 °C и сбрасывает частоту.
+                GpuTemp = Math.Round(70 + Math.Min(17, t / 60.0) + rnd.NextDouble() * 1.5, 1),
+                GpuClock = Math.Round(t > 1000 ? 1740 + rnd.NextDouble() * 20 : 1860 + rnd.NextDouble() * 20),
                 Others = others,
             });
         }

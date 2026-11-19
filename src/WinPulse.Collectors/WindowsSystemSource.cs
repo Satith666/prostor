@@ -1,5 +1,6 @@
 using WinPulse.Collectors.Gpu;
 using WinPulse.Collectors.Interop;
+using WinPulse.Collectors.Sensors;
 using WinPulse.Core;
 using WinPulse.Core.Model;
 
@@ -11,6 +12,7 @@ public sealed class WindowsSystemSource : ISystemSource
     private readonly ProcessCollector _processes = new();
     private readonly IdentityCache _identities = new();
     private readonly ServiceMap _services = new();
+    private readonly SensorReader _sensors = new();
     private readonly PdhQuery _query = new();
     private readonly PdhCounter? _utility;
     private readonly PdhCounter? _performance;
@@ -191,10 +193,13 @@ public sealed class WindowsSystemSource : ISystemSource
         }
     }
 
+    public SensorSnapshot? ReadSensors() => _sensors.Read();
+
     public void Dispose()
     {
         _processes.Dispose();
         _query.Dispose();
         _gpu.Dispose();
+        _sensors.Dispose();
     }
 }

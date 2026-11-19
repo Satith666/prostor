@@ -113,6 +113,20 @@ public sealed class RawSnapshot
     public IReadOnlyDictionary<int, GpuProcessState> GpuByPid { get; init; } = new Dictionary<int, GpuProcessState>();
 }
 
+/// <summary>Датчики железа (LibreHardwareMonitor). null — датчик недоступен.</summary>
+public sealed class SensorSnapshot
+{
+    public double? CpuTemp { get; init; }
+    public double? CpuPower { get; init; }
+    public double? GpuTemp { get; init; }
+    public double? GpuHotspot { get; init; }
+    public double? GpuPower { get; init; }
+    public double? GpuClockMHz { get; init; }
+    public double? GpuFanPercent { get; init; }
+    /// <summary>Температура процессора не читается: нет драйвера PawnIO (ставится отдельно, по желанию).</summary>
+    public bool CpuNeedsDriver { get; init; }
+}
+
 public sealed record AppIdentity(string? Path, string? Description, string? Company);
 
 public sealed record ServiceEntry(string Name, string DisplayName);
@@ -127,4 +141,6 @@ public interface ISystemSource : IDisposable
     /// <summary>Путь, описание и издатель процесса (с кэшем). Вызывается из того же потока, что Capture.</summary>
     AppIdentity Identify(ProcessSample process);
     IReadOnlyDictionary<int, IReadOnlyList<ServiceEntry>> ServicesByPid { get; }
+    /// <summary>Датчики. Вызывается из того же потока, что Capture. null — датчики недоступны (или ещё не готовы).</summary>
+    SensorSnapshot? ReadSensors() => null;
 }

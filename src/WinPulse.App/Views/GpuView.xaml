@@ -8,7 +8,10 @@
         <StackPanel Margin="28,24,28,28">
             <TextBlock Text="Видеокарта" Style="{StaticResource H1}"/>
             <TextBlock Text="Те же счётчики, что в Диспетчере задач: загрузка самого занятого блока видеокарты и видеопамять."
-                       Style="{StaticResource FaintText}" Margin="0,4,0,18" TextWrapping="Wrap"/>
+                       Style="{StaticResource FaintText}" Margin="0,4,0,8" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding SensorText}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" Margin="0,0,0,18"
+                       Visibility="{Binding SensorText, Converter={StaticResource NullToVis}}"/>
+            <Border Height="10" Visibility="{Binding SensorText, Converter={StaticResource NullToVisInv}}"/>
 
             <TextBlock Text="Счётчики видеокарты недоступны: нужен драйвер WDDM 2.0+ (Windows 10 1709 и новее)."
                        Style="{StaticResource MutedText}" Margin="0,0,0,16"
