@@ -156,46 +156,102 @@ public static class SessionAnalyzer
             .ToList();
     }
 
-    /// <summary>Резкие всплески нагрузки от сторонних программ и провалы FPS — с тем, что было в эту секунду.</summary>
+    /// <summary>
+    /// Эпизоды: сторонняя программа заметно грузила систему или проседали кадры. Соседние секунды с одной причиной
+    /// объединяются в один эпизод — «с 25:10, 1 мин 10 с: … грузил процессор до 30%, FPS падал до 44».
+    /// </summary>
     private static List<SessionMoment> Moments(List<SessionSample> s)
     {
-        var result = new List<SessionMoment>();
         var fps = s.Where(x => x.Fps is > 0).Select(x => x.Fps!.Value).OrderBy(v => v).ToArray();
         double fpsMedian = fps.Length > 0 ? FrameStats.Percentile(fps, 50) : 0;
-        double lastT = -60;
-        foreach (var x in s)
+
+        // Причина в каждую секунду: программа (нагрузка или диск) или просто провал FPS.
+        static (string Key, string Kind, SessionApp? App) Cause(SessionSample x, double median)
         {
-            if (x.T - lastT < 30) continue; // не чаще раза в полминуты, чтобы список был читаемым
             var top = x.Others.OrderByDescending(o => o.Cpu + o.Gpu * 1.5).FirstOrDefault();
+            if (top is not null && (top.Cpu >= 15 || top.Gpu >= 15)) return (top.Name, "load", top);
             var topIo = x.Others.OrderByDescending(o => o.Io).FirstOrDefault();
-            string? text = null;
-            if (x.Fps is double f && fpsMedian > 0 && f < fpsMedian * 0.6)
-            {
-                string cause = top is not null && top.Cpu + top.Gpu >= 8
-                    ? Lang.T($"в это время «{top.Name}» занимал {top.Cpu:0}% процессора и {top.Gpu:0}% видеокарты", $"at that moment “{top.Name}” used {top.Cpu:0}% CPU and {top.Gpu:0}% GPU")
-                    : x.DiskActive >= 90
-                        ? Lang.T("в это время диск был занят полностью", "the disk was fully busy at that moment")
-                        : Lang.T("сторонние программы ни при чём — вероятно, тяжёлая сцена или подгрузка", "not caused by other apps — likely a heavy scene or loading");
-                text = Lang.T($"FPS упал до {f:0} (обычно {fpsMedian:0}): {cause}.", $"FPS dropped to {f:0} (usually {fpsMedian:0}): {cause}.");
-            }
-            else if (top is not null && top.Cpu >= 15)
-            {
-                text = Lang.T($"«{top.Name}» нагрузил процессор на {top.Cpu:0}%.", $"“{top.Name}” loaded the CPU to {top.Cpu:0}%.");
-            }
-            else if (top is not null && top.Gpu >= 15)
-            {
-                text = Lang.T($"«{top.Name}» нагрузил видеокарту на {top.Gpu:0}%.", $"“{top.Name}” loaded the GPU to {top.Gpu:0}%.");
-            }
-            else if (x.DiskActive >= 95 && topIo is not null && topIo.Io >= 20_000_000)
-            {
-                text = Lang.T($"Диск занят полностью: «{topIo.Name}» читал и писал {Ru.Rate(topIo.Io)}.", $"Disk fully busy: “{topIo.Name}” was moving {Ru.Rate(topIo.Io)}.");
-            }
-            if (text is null) continue;
-            result.Add(new SessionMoment(x.T, text));
-            lastT = x.T;
-            if (result.Count >= 8) break;
+            if (x.DiskActive >= 95 && topIo is not null && topIo.Io >= 20_000_000) return (topIo.Name, "disk", topIo);
+            if (x.Fps is double f && median > 0 && f < median * 0.6) return ("", "fps", null);
+            return ("", "", null);
         }
-        return result;
+
+        var episodes = new List<(string Key, string Kind, int From, int To)>();
+        for (int i = 0; i < s.Count; i++)
+        {
+            var (key, kind, _) = Cause(s[i], fpsMedian);
+            if (kind.Length == 0) continue;
+            if (episodes.Count > 0)
+            {
+                var last = episodes[^1];
+                if (last.Key == key && last.Kind == kind && s[i].T - s[last.To].T <= 6)
+                {
+                    episodes[^1] = (last.Key, last.Kind, last.From, i);
+                    continue;
+                }
+            }
+            episodes.Add((key, kind, i, i));
+        }
+
+        var result = new List<SessionMoment>();
+        foreach (var e in episodes)
+        {
+            var range = s.Skip(e.From).Take(e.To - e.From + 1).ToList();
+            double seconds = range[^1].T - range[0].T + 1;
+            var rangeFps = range.Where(x => x.Fps is > 0).Select(x => x.Fps!.Value).ToList();
+            double? minFps = rangeFps.Count > 0 ? rangeFps.Min() : null;
+            bool fpsHit = minFps is double m && fpsMedian > 0 && m < fpsMedian * 0.75;
+            if (e.Kind != "fps" && seconds < 3 && !fpsHit) continue; // мимолётный всплеск без последствий — не шумим
+
+            string fpsPart = minFps is null ? ""
+                : fpsHit ? Lang.T($" FPS падал до {minFps:0} (обычно {fpsMedian:0}).", $" FPS dropped to {minFps:0} (usually {fpsMedian:0}).")
+                : Lang.T(" На FPS это заметно не повлияло.", " FPS wasn't noticeably affected.");
+            string length = Seconds(seconds);
+            string text;
+            if (e.Kind == "load")
+            {
+                double cpu = range.Max(x => Find(x, e.Key)?.Cpu ?? 0), gpu = range.Max(x => Find(x, e.Key)?.Gpu ?? 0);
+                var ru = new List<string>();
+                var en = new List<string>();
+                if (cpu >= 10) { ru.Add($"процессор до {cpu:0}%"); en.Add($"the CPU up to {cpu:0}%"); }
+                if (gpu >= 10) { ru.Add($"видеокарту до {gpu:0}%"); en.Add($"the GPU up to {gpu:0}%"); }
+                text = Lang.T($"«{e.Key}» грузил {string.Join(" и ", ru)} в течение {length}.",
+                    $"“{e.Key}” loaded {string.Join(" and ", en)} for {length}.") + fpsPart;
+            }
+            else if (e.Kind == "disk")
+            {
+                string rate = Ru.Rate(range.Max(x => Find(x, e.Key)?.Io ?? 0));
+                text = Lang.T($"Диск был занят полностью в течение {length}: «{e.Key}» читал и писал до {rate}.",
+                    $"The disk was fully busy for {length}: “{e.Key}” moved up to {rate}.") + fpsPart;
+            }
+            else
+            {
+                bool disk = range.Any(x => x.DiskActive >= 90);
+                text = Lang.T(
+                    $"FPS падал до {minFps:0} (обычно {fpsMedian:0}) в течение {length}. Сторонние программы ни при чём" +
+                    (disk ? ", но диск в это время был занят — похоже на подгрузку уровня." : " — вероятно, тяжёлая сцена или подгрузка."),
+                    $"FPS dropped to {minFps:0} (usually {fpsMedian:0}) for {length}. Not caused by other apps" +
+                    (disk ? ", but the disk was busy — looks like level streaming." : " — likely a heavy scene or loading."));
+            }
+            result.Add(new SessionMoment(range[0].T, text));
+        }
+
+        // Сначала то, что било по FPS, потом остальное; в списке — по времени.
+        return result
+            .OrderByDescending(m => m.Text.Contains(Lang.T("FPS падал", "FPS dropped"), StringComparison.Ordinal))
+            .Take(8)
+            .OrderBy(m => m.T)
+            .ToList();
+    }
+
+    private static SessionApp? Find(SessionSample x, string name) => x.Others.FirstOrDefault(o => o.Name == name);
+
+    private static string Seconds(double seconds)
+    {
+        int total = (int)Math.Round(seconds);
+        if (total < 60) return Lang.T($"{total} с", $"{total} s");
+        int min = total / 60, sec = total % 60;
+        return sec == 0 ? Lang.T($"{min} мин", $"{min} min") : Lang.T($"{min} мин {sec} с", $"{min} min {sec} s");
     }
 
     private static string? AdviceFor(string name)
