@@ -34,6 +34,14 @@ public partial class App : Application
             return;
         }
 
+        // Проверка цепочки автообновления в CI (без установки).
+        int selfTestIndex = Array.IndexOf(args, "--update-selftest");
+        if (selfTestIndex >= 0 && selfTestIndex + 1 < args.Length)
+        {
+            Shutdown(Updater.SelfTest(args[selfTestIndex + 1]));
+            return;
+        }
+
         // Помощник замера задержек DPC/ISR (запускается с правами администратора только на время замера).
         int latencyIndex = Array.IndexOf(args, "--latency");
         if (latencyIndex >= 0)

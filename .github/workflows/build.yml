@@ -162,6 +162,34 @@ jobs:
             Write-Output "::warning title=PresentMon smoke::no csv. $console"
           }
 
+      # Установщик: тихая установка для пользователя, повторный запуск WinPulse после неё (как при автообновлении), удаление.
+      - name: Installer smoke test
+        if: success()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release -Filter 'WinPulse-Setup-*.exe' | Select-Object -First 1
+          $p = Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/LANG=ru' -PassThru -Wait
+          $dir = Join-Path $env:LOCALAPPDATA 'Programs\WinPulse'
+          $files = (Get-ChildItem $dir -ErrorAction SilentlyContinue | ForEach-Object Name) -join ', '
+          Start-Sleep 5
+          $running = @(Get-Process WinPulse -ErrorAction SilentlyContinue).Count
+          Write-Output "::notice title=Installer::exit $($p.ExitCode); files: $files; relaunched: $running"
+          Get-Process WinPulse -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep 2
+          $u = Start-Process (Join-Path $dir 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES' -PassThru -Wait
+          Start-Sleep 3
+          Write-Output "::notice title=Uninstaller::exit $($u.ExitCode); exe left: $(Test-Path (Join-Path $dir 'WinPulse.exe'))"
+
+      # Цепочка автообновления: найти выпуск на GitHub, скачать установщик, сверить SHA-256 (без установки).
+      - name: Update self-test
+        if: success()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $p = Start-Process dist/WinPulse.exe -ArgumentList '--update-selftest', "$PWD\update-selftest.txt" -PassThru -Wait
+          Write-Output "::notice title=Update self-test::exit $($p.ExitCode): $((Get-Content update-selftest.txt -ErrorAction SilentlyContinue) -join ' | ')"
+
       # Замер задержек DPC/ISR на раннере (он работает с правами администратора) — проверка ETW-кода на настоящей Windows.
       - name: Latency smoke test
         if: success()

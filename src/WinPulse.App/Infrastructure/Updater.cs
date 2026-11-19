@@ -42,12 +42,12 @@ public static class Updater
     }
 
     /// <summary>Самый новый выпуск новее текущей версии или null.</summary>
-    public static async Task<UpdateInfo?> CheckAsync(CancellationToken ct = default)
+    public static async Task<UpdateInfo?> CheckAsync(CancellationToken ct = default, Version? current = null)
     {
         using var http = Client();
         await using var stream = await http.GetStreamAsync(Releases, ct);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-        return ReleaseFeed.Pick(doc.RootElement, Current);
+        return ReleaseFeed.Pick(doc.RootElement, current ?? Current);
     }
 
     /// <summary>Скачивает установщик и проверяет SHA-256. Возвращает путь к файлу.</summary>
@@ -106,6 +106,40 @@ public static class Updater
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Проверка цепочки обновления для CI (--update-selftest &lt;файл&gt;): найти последний выпуск, скачать
+    /// установщик, сверить SHA-256. Ничего не устанавливает. Возвращает код выхода.
+    /// </summary>
+    public static int SelfTest(string outFile)
+    {
+        var lines = new List<string>();
+        int code;
+        try
+        {
+            var update = Task.Run(() => CheckAsync(default, new Version(0, 0, 0))).GetAwaiter().GetResult();
+            if (update is null)
+            {
+                lines.Add("no release");
+                code = 1;
+            }
+            else
+            {
+                lines.Add($"release {update.Tag} setup={update.SetupName} digest={(update.Sha256 is null ? "sums" : "api")}");
+                string path = Task.Run(() => DownloadAsync(update, new Progress<double>())).GetAwaiter().GetResult();
+                lines.Add($"downloaded {new FileInfo(path).Length} bytes, sha256 ok");
+                try { File.Delete(path); } catch { }
+                code = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            lines.Add("error: " + ex.Message);
+            code = 2;
+        }
+        try { File.WriteAllLines(outFile, lines); } catch { }
+        return code;
     }
 
     /// <summary>Запускает тихую установку поверх. После неё установщик сам запустит WinPulse снова.</summary>
