@@ -1,5 +1,7 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -71,7 +73,20 @@ public partial class App : Application
         var window = new MainWindow { DataContext = _vm };
         MainWindow = window;
         window.Closed += (_, _) => Shutdown();
-        if (shotsDir is not null) Mark(shotsDir, "before show");
+        if (shotsDir is not null)
+        {
+            Mark(shotsDir, "before show");
+            // Экран сборочной машины 1024×768 — разрешаем окну быть больше экрана, чтобы снимать в настоящем размере.
+            window.WindowStyle = WindowStyle.None;
+            window.ResizeMode = ResizeMode.NoResize;
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            window.Left = 0;
+            window.Top = 0;
+            window.Width = ShotWidth;
+            window.Height = ShotHeight;
+            window.SourceInitialized += (_, _) =>
+                HwndSource.FromHwnd(new WindowInteropHelper(window).Handle)?.AddHook(AllowLargeWindow);
+        }
         window.Show();
         if (shotsDir is not null) Mark(shotsDir, "shown");
         _vm.Start();
@@ -99,24 +114,49 @@ public partial class App : Application
         }
     }
 
+    private const int ShotWidth = 1320;
+    private const int ShotHeight = 900;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PointInt
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public PointInt Reserved;
+        public PointInt MaxSize;
+        public PointInt MaxPosition;
+        public PointInt MinTrackSize;
+        public PointInt MaxTrackSize;
+    }
+
+    private static IntPtr AllowLargeWindow(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WmGetMinMaxInfo = 0x0024;
+        if (msg != WmGetMinMaxInfo) return IntPtr.Zero;
+        var info = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        info.MaxTrackSize = new PointInt { X = 4000, Y = 4000 };
+        info.MaxSize = new PointInt { X = 4000, Y = 4000 };
+        Marshal.StructureToPtr(info, lParam, false);
+        handled = true;
+        return IntPtr.Zero;
+    }
+
     private static async Task ScreenshotTourAsync(Window window, MainViewModel vm, string dir)
     {
         Directory.CreateDirectory(dir);
         Mark(dir, "tour begin");
-        var size = new Size(1320, 900);
         try
         {
             var root = (FrameworkElement)window.Content;
-            window.Content = null;
-            root.DataContext = vm;
-            void Layout()
-            {
-                root.Measure(size);
-                root.Arrange(new Rect(size));
-                root.UpdateLayout();
-            }
+            void Layout() => window.UpdateLayout();
 
             Layout();
+            Mark(dir, $"window {window.ActualWidth}x{window.ActualHeight}, content {root.ActualWidth}x{root.ActualHeight}");
             Mark(dir, "first layout");
             await Task.Delay(10000);
             Mark(dir, "warmed up");
@@ -130,7 +170,7 @@ public partial class App : Application
                 bool slow = item.Key is "problems" or "drivers" or "startup" or "windowed" or "optimize";
                 await Task.Delay(slow ? 8000 : 3000);
                 Layout();
-                var bitmap = new RenderTargetBitmap((int)size.Width, (int)size.Height, 96, 96, PixelFormats.Pbgra32);
+                var bitmap = new RenderTargetBitmap((int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight), 96, 96, PixelFormats.Pbgra32);
                 bitmap.Render(root);
                 var encoder = new PngBitmapEncoder();
                 encoder.Frames.Add(BitmapFrame.Create(bitmap));
