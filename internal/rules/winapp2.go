@@ -102,6 +102,8 @@ var (
 		"my music": true, "videos": true, "my videos": true, "downloads": true, "onedrive": true, "dropbox": true,
 		"google drive": true, "saved games": true, "contacts": true, "favorites": true, "links": true, "searches": true,
 		"extensions": true, "plugins": true, "keys": true, "mail": true, "inbox": true,
+		// Windows XP names that are now links into other folders: Prostor never follows links
+		"documents and settings": true, "application data": true, "local settings": true,
 	}
 	nameDeny   = regexp.MustCompile(`(?i)cookie|histor|password|username|session|autofill|bookmark|preference|\btabs\b|\bsync\b|pinned|extension|favicon|search engine|secure|login|credential|\bmru\b|recent|jump ?list|registry|\bdrm\b|wallet|saved|setting|backup|licen`)
 	junkMaskRe = regexp.MustCompile(`\.(log|logs|log\.|tmp|temp|dmp|mdmp|hdmp|etl|lo_|trace|crash)$`)
