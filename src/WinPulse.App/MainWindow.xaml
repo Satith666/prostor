@@ -46,6 +46,9 @@
         <DataTemplate DataType="{x:Type vm:UpscalersViewModel}">
             <v:UpscalersView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LatencyViewModel}">
+            <v:LatencyView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:PlaceholderViewModel}">
             <v:PlaceholderView/>
         </DataTemplate>

@@ -136,6 +136,7 @@ public static class UpscalerCatalog
 
         var dlss = g.Find(UpscalerTech.Dlss);
         bool hasFsr = g.Has(UpscalerTech.Fsr), hasXess = g.Has(UpscalerTech.Xess);
+        string other = hasFsr && hasXess ? Lang.T("FSR и XeSS", "FSR and XeSS") : hasFsr ? "FSR" : "XeSS";
 
         if (dlss is not null && gpu.IsRtx)
         {
@@ -147,13 +148,13 @@ public static class UpscalerCatalog
         }
         else if (dlss is null && (hasFsr || hasXess) && gpu.IsRtx && g.AntiCheat is null)
         {
-            list.Add(Lang.T("В игре нет DLSS, только " + (hasFsr ? "FSR" : "XeSS") + ". OptiScaler умеет подставить вместо него DLSS — на RTX картинка обычно чище. Только для одиночной игры.",
-                "The game has no DLSS, only " + (hasFsr ? "FSR" : "XeSS") + ". OptiScaler can substitute DLSS — usually a cleaner image on RTX. Single-player only."));
+            list.Add(Lang.T($"В игре нет DLSS, только {other}. OptiScaler умеет подставить вместо них DLSS — на RTX картинка обычно чище. Только для одиночной игры.",
+                $"The game has no DLSS, only {other}. OptiScaler can substitute DLSS — usually a cleaner image on RTX. Single-player only."));
         }
         else if (hasFsr || hasXess)
         {
-            list.Add(Lang.T("Включите " + (hasFsr ? "FSR" : "XeSS") + " в настройках игры — это прибавка FPS ценой небольшой потери чёткости.",
-                "Enable " + (hasFsr ? "FSR" : "XeSS") + " in the game's settings — more FPS at a small cost in sharpness."));
+            list.Add(Lang.T($"Включите {(hasXess && !hasFsr ? "XeSS" : "FSR")} в настройках игры — это прибавка FPS ценой небольшой потери чёткости.",
+                $"Enable {(hasXess && !hasFsr ? "XeSS" : "FSR")} in the game's settings — more FPS at a small cost in sharpness."));
         }
 
         if (g.Has(UpscalerTech.DlssFrameGen) && gpu.IsRtx && !gpu.HasDlssFrameGen && g.AntiCheat is null)

@@ -34,6 +34,15 @@ public partial class App : Application
             return;
         }
 
+        // Помощник замера задержек DPC/ISR (запускается с правами администратора только на время замера).
+        int latencyIndex = Array.IndexOf(args, "--latency");
+        if (latencyIndex >= 0)
+        {
+            try { Lang.English = AppSettings.Load().Language == "en"; } catch { }
+            Shutdown(LatencyRunner.RunHost(args, latencyIndex));
+            return;
+        }
+
         base.OnStartup(e);
         DispatcherUnhandledException += OnDispatcherException;
         AppDomain.CurrentDomain.UnhandledException += (_, ev) => Log.Write("FATAL", ev.ExceptionObject?.ToString() ?? "unknown");

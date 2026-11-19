@@ -129,6 +129,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Add("optimize", "nav.optimize", "Icon.Optimize", Optimization);
         Add("startup", "nav.startup", "Icon.Startup", Startup);
         Add("drivers", "nav.drivers", "Icon.Drivers", new DriversViewModel());
+        Add("latency", "nav.latency", "Icon.Latency", new LatencyViewModel(IsDemo));
 
         // Игровые сессии пишутся в фоне, на каждом кадре мониторинга (даже если окно свёрнуто).
         _tracker.IsPinned = path => path is not null && _settings.GameExe is string pinned &&
