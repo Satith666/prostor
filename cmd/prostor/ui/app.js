@@ -162,6 +162,16 @@ function toast(msg, err) {
   setTimeout(() => t.remove(), err ? 6500 : 3500);
 }
 
+// Уведомление с кнопкой («Показать» для сохранённого файла).
+function toastAction(msg, label, fn) {
+  const t = document.createElement('div');
+  t.className = 'toast act';
+  t.innerHTML = `<span>${esc(msg)}</span><button class="linkbtn">${esc(label)}</button>`;
+  $('button', t).onclick = () => { fn(); t.remove(); };
+  $('#toasts').appendChild(t);
+  setTimeout(() => t.remove(), 10000);
+}
+
 function openDialog(html, opts = {}) {
   const o = document.createElement('div');
   o.className = 'overlay';
@@ -898,7 +908,7 @@ async function loadAnalysis(path) {
   try {
     const [view, top, types] = await Promise.all([
       api('/api/analyze/view?path=' + encodeURIComponent(path)), api('/api/analyze/top'), api('/api/analyze/types')]);
-    Object.assign(S.an, { view, top: top || [], types });
+    Object.assign(S.an, { view, top: top || [], types, old: null, growth: null });
   } catch (e) {
     S.an.error = e.message;
   }
@@ -1175,6 +1185,7 @@ function mapHTML(a) {
       <td class="w"><div class="share"><div class="bar"><i style="width:${pct(it.size, total)}%"></i></div><span>${pctTxt(it.size, total)}</span></div></td>
       <td class="w small faint">${fmtDate(it.mtime)}</td>
       <td class="w">${it.group ? '' : `<div class="ra"><button class="btn sm icon quiet" title="Показать в Проводнике" data-act="reveal" data-path="${esc(it.path)}">${ic('reveal')}</button>
+        ${it.isDir && expertMode() && !isSystemPath(it.path) ? `<button class="btn sm icon quiet" title="Сжать средствами NTFS" data-act="compress" data-path="${esc(it.path)}" data-size="${it.size}">${ic('archive')}</button>` : ''}
         <button class="btn sm icon quiet" title="Удалить" data-act="del" data-i="${k}">${ic('trash')}</button></div>`}</td></tr>`;
   }).join('');
   return `<div class="crumbs">${v.parent ? `<button data-act="dir" data-path="${esc(v.parent)}" title="На уровень выше">${ic('back', 'sep')}</button>` : ''}${crumbs}</div>
@@ -1186,10 +1197,104 @@ function mapHTML(a) {
     ${all.length > a.shown ? `<div class="more"><button class="btn" data-act="more">Показать все (${fmtNum(all.length)})</button></div>` : ''}`;
 }
 
+// Что выросло: сравнение с прошлым снимком этой же папки или диска.
+async function loadGrowth(a, id) {
+  a.growthLoading = true;
+  try { a.growth = await api('/api/analyze/growth?id=' + encodeURIComponent(id || '')); } catch (e) { a.growth = { error: e.message }; }
+  a.growthLoading = false;
+  rerender('analyze');
+}
+function agoText(t) {
+  const days = Math.floor((Date.now() - new Date(t).getTime()) / 86400000);
+  if (days < 1) return 'сегодня';
+  if (days === 1) return 'вчера';
+  return fmtNum(days) + ' ' + plural(days, 'день', 'дня', 'дней') + ' назад';
+}
+function growthHTML(a) {
+  const g = a.growth;
+  if (!g) { if (!a.growthLoading) loadGrowth(a); return '<p class="skel">Сравнение…</p>'; }
+  if (g.error) return `<div class="empty">${ic('warn')}<h3>Не удалось сравнить</h3><p>${esc(g.error)}</p></div>`;
+  if (g.none) {
+    return `<div class="empty">${ic('history')}<h3>Пока не с чем сравнить</h3><p>Снимок этого анализа сохранён. Проанализируйте это же место через несколько дней, и здесь будет видно, какие папки выросли и насколько.</p></div>`;
+  }
+  const d = g.newSize - g.oldSize;
+  const opts = (g.snapshots || []).map((x) => `<option value="${esc(x.id)}" ${x.id === g.snapshot.id ? 'selected' : ''}>${esc(fmtDate(x.time, true))} (${agoText(x.time)}) — ${fmtSize(x.size)}</option>`).join('');
+  const row = (it, sign) => `<tr class="go" data-act="grOpen" data-path="${esc(it.path)}">
+      <td><div class="nm">${ic('folder')}<div class="tx"><div>${esc(it.name)}</div><small class="path" title="${esc(it.path)}">${ltr(it.path)}</small></div></div></td>
+      <td class="r w num ${sign > 0 ? 'gr-up' : 'gr-down'}">${sign > 0 ? '+' : '−'}${fmtSize(Math.abs(it.delta))}</td>
+      <td class="w small faint">${it.added ? 'новая папка' : it.gone ? 'папка удалена' : fmtSize(it.old) + ' → ' + fmtSize(it.new)}</td>
+      <td class="w"><div class="ra">${it.gone ? '' : `<button class="btn sm icon quiet" title="Показать в Проводнике" data-act="reveal" data-path="${esc(it.path)}">${ic('reveal')}</button>`}</div></td></tr>`;
+  const methodNote = g.snapshot.method && g.methodNow && g.snapshot.method !== g.methodNow
+    ? note('info', 'Прошлый анализ сделан другим способом (обход папок или таблица файлов NTFS), поэтому системные папки могут отличаться сильнее, чем на самом деле.') : '';
+  return `<div class="gr-head"><div class="gr-total"><b class="${d >= 0 ? 'gr-up' : 'gr-down'}">${d >= 0 ? '+' : '−'}${fmtSize(Math.abs(d))}</b>
+      <span>с ${esc(fmtDate(g.snapshot.time))} (${agoText(g.snapshot.time)}): было ${fmtSize(g.oldSize)}, стало ${fmtSize(g.newSize)}</span></div>
+      <label class="gr-sel">Сравнить со снимком <select class="input" id="grSel">${opts}</select></label></div>${methodNote}
+    <h2 class="sec">Выросло</h2>
+    ${(g.grew || []).length ? `<table class="tbl"><thead><tr><th>Папка</th><th class="r">Изменение</th><th>Было → стало</th><th></th></tr></thead><tbody>${g.grew.map((it) => row(it, 1)).join('')}</tbody></table>`
+      : '<p class="muted">Ни одна папка заметно не выросла.</p>'}
+    ${(g.shrank || []).length ? `<h2 class="sec">Уменьшилось</h2><table class="tbl"><tbody>${g.shrank.map((it) => row(it, -1)).join('')}</tbody></table>` : ''}`;
+}
+
+// Экспорт отчёта в «Загрузки».
+function exportDialog() {
+  const d = openDialog(`<h2>Экспорт отчёта</h2><p class="muted">Файл сохранится в папку «Загрузки».</p>
+    <div class="setting col"><h3>Что</h3><div class="seg" id="exWhat"><button class="on" data-v="folders">Папки</button><button data-v="top">Крупные файлы</button><button data-v="old">Старые файлы</button></div></div>
+    <div class="setting col"><h3>Формат</h3><div class="seg" id="exFmt"><button class="on" data-v="csv">CSV для Excel</button><button data-v="html">Страница HTML</button></div></div>
+    <div class="btns"><button class="btn" data-v="0">Отмена</button><button class="btn primary" data-v="1">${ic('download')}Сохранить</button></div>`);
+  for (const id of ['#exWhat', '#exFmt']) {
+    $$(id + ' button', d.el).forEach((b) => { b.onclick = () => { $$(id + ' button', d.el).forEach((x) => x.classList.toggle('on', x === b)); }; });
+  }
+  $$('.btns button', d.el).forEach((b) => {
+    b.onclick = async () => {
+      if (b.dataset.v !== '1') { d.close(); return; }
+      const what = $('#exWhat .on', d.el).dataset.v, format = $('#exFmt .on', d.el).dataset.v;
+      b.disabled = true;
+      try {
+        const r = await api('/api/analyze/export', { what, format });
+        d.close();
+        toastAction('Отчёт сохранён: ' + r.path.split(/[\\/]/).pop(), 'Показать', () => api('/api/fs/reveal', { path: r.path }));
+      } catch (e) { b.disabled = false; toast(e.message, true); }
+    };
+  });
+}
+
+// Сжатие папки средствами NTFS (режим «Эксперт»).
+async function compressFolder(path, size) {
+  const ok = await ask('Сжать папку?', `<p>Файлы папки <b>${esc(path.split(/[\\/]/).pop())}</b> (${fmtSize(size)}) будут сжаты средствами NTFS. Программы и вы продолжите открывать их как обычно, Windows распаковывает данные на лету. Сжатие можно отменить в свойствах папки.</p>
+    ${note('info', 'Хорошо сжимаются документы, журналы, старые проекты и исходный код. Видео, фото, музыка и архивы уже сжаты и почти не уменьшатся. Не сжимайте папки, с которыми часто работаете.')}`, 'Сжать');
+  if (!ok) return;
+  S.compressing = path;
+  toast('Сжатие запущено, это может занять несколько минут');
+  try {
+    const s = await startJob('compress', '/api/fs/compress', { path });
+    if (s.err) throw new Error(s.err);
+    const r = s.result || {};
+    toast(r.saved > 0 ? `Папка сжата: освобождено ${fmtSize(r.saved)} (было ${fmtSize(r.before)}, стало ${fmtSize(r.after)})` : 'Папка сжата, но места почти не освободилось: данные уже были сжаты');
+    if (S.an && S.an.view) await loadAnalysis(S.an.view.path);
+  } catch (e) { toast(e.message, true); }
+  S.compressing = '';
+}
+
+// Крупные файлы: все или не менявшиеся больше года, с фильтром по типу.
+async function loadOld(a) {
+  try { a.old = (await api('/api/analyze/top?old=1')) || []; } catch (e) { a.old = []; toast(e.message, true); }
+  rerender('analyze');
+}
+function topList(a) {
+  let list = a.topScope === 'old' ? (a.old || []) : (a.top || []);
+  if (a.topCat) list = list.filter((f) => f.cat === a.topCat);
+  return list;
+}
+const CAT_NAMES = { video: 'Видео', image: 'Изображения', audio: 'Звук', archive: 'Архивы', diskimage: 'Образы дисков', program: 'Программы', document: 'Документы', code: 'Код', model: '3D и проекты', data: 'Данные и кэш', other: 'Прочее' };
 function topHTML(a) {
-  const list = a.top || [];
+  if (a.topScope === 'old' && !a.old) { loadOld(a); return '<p class="skel">Загрузка…</p>'; }
+  const base = a.topScope === 'old' ? (a.old || []) : (a.top || []);
+  const cats = [...new Set(base.map((f) => f.cat))].sort((x, y) => sum(base.filter((f) => f.cat === y), (f) => f.size) - sum(base.filter((f) => f.cat === x), (f) => f.size));
+  const filters = `<div class="filters"><div class="seg">${[['all', 'Все крупные'], ['old', 'Не менялись больше года']].map(([v, n]) => `<button class="${(a.topScope || 'all') === v ? 'on' : ''}" data-act="topScope" data-v="${v}">${n}</button>`).join('')}</div>
+    <div class="chips">${[''].concat(cats).map((c) => `<button class="chip ${(a.topCat || '') === c ? 'on' : ''}" data-act="topCat" data-v="${c}">${c ? ic(catIcon(c)) + esc(CAT_NAMES[c] || c) : 'Все типы'}</button>`).join('')}</div></div>`;
+  const list = topList(a);
   const selSize = sum(list.filter((f) => a.sel.has(f.path)), (f) => f.size);
-  const all = list.length && a.sel.size === list.length;
+  const all = list.length && list.every((f) => a.sel.has(f.path));
   const rows = list.map((f) => {
     const name = f.path.split(/[\\/]/).pop();
     return `<tr><td class="w"><input type="checkbox" class="ck" data-act="topSel" data-path="${esc(f.path)}" ${a.sel.has(f.path) ? 'checked' : ''} aria-label="${esc(name)}"></td>
@@ -1197,7 +1302,10 @@ function topHTML(a) {
       <td class="r w num">${fmtSize(f.size)}</td><td class="w small faint">${fmtDate(f.mtime)}</td>
       <td class="w"><div class="ra"><button class="btn sm icon quiet" title="Показать в Проводнике" data-act="reveal" data-path="${esc(f.path)}">${ic('reveal')}</button></div></td></tr>`;
   }).join('');
-  return `<p class="muted" style="margin-bottom:16px">${fmtNum(list.length)} самых крупных файлов. Отметьте ненужные и удалите: они попадут в ${qWhere()}.</p>
+  const lead = a.topScope === 'old'
+    ? `${fmtNum(list.length)} крупных файлов, которые не менялись больше года. Часто это забытые установщики, образы и старые проекты.`
+    : `${fmtNum(list.length)} самых крупных файлов.`;
+  return `${filters}<p class="muted" style="margin-bottom:16px">${lead} Отметьте ненужные и удалите: они попадут в ${qWhere()}.</p>
     <table class="tbl"><thead><tr><th><input type="checkbox" class="ck" data-act="topAll" ${all ? 'checked' : ''} aria-label="Выбрать все"></th><th>Файл</th><th class="r">На диске</th><th>Изменён</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="5" class="faint">Нет файлов</td></tr>'}</tbody></table>
     <div class="actionbar" id="topBar"><div class="sum"><b>${fmtSize(selSize)}</b><span>выбрано ${nFiles(a.sel.size)}</span></div><span class="grow"></span>
@@ -1239,7 +1347,7 @@ PAGES.analyze = (m) => {
   } else {
     const sm = a.summary || {};
     const t = a.types || {};
-    const tabs = [['map', 'Карта папок'], ['top', 'Крупные файлы'], ['types', 'Типы файлов']]
+    const tabs = [['map', 'Карта папок'], ['top', 'Крупные файлы'], ['types', 'Типы файлов'], ['growth', 'Что выросло']]
       .map(([id, n]) => `<button class="${a.tab === id ? 'on' : ''}" data-act="tab" data-tab="${id}">${n}</button>`).join('');
     const notes = [];
     if (sm.other > 0) notes.push(`<span title="Служебные данные файловой системы и папки без доступа">${ic('info')}служебные и недоступные данные: ${fmtSize(sm.other)}</span>`);
@@ -1249,9 +1357,10 @@ PAGES.analyze = (m) => {
     let part;
     if (a.tab === 'top') part = topHTML(a);
     else if (a.tab === 'types') part = typesHTML(a);
+    else if (a.tab === 'growth') part = growthHTML(a);
     else part = `<div id="tmPart">${mapHTML(a)}</div>`;
     body = `<div class="an-sum"><b>${fmtSize(sm.size)}</b><span class="muted">${nFiles(sm.files || 0)} в ${fmtNum(sm.dirs || 0)} ${plural(sm.dirs || 0, 'папке', 'папках', 'папках')}, анализ занял ${fmtDur(sm.took)}${sm.method === 'mft' ? ' (прочитана таблица файлов NTFS)' : ''}</span>
-        <span class="spacer"></span><button class="btn sm" data-act="start" data-path="${esc(a.root)}">${ic('refresh')}Заново</button></div>
+        <span class="spacer"></span><button class="btn sm" data-act="export">${ic('download')}Экспорт</button><button class="btn sm" data-act="start" data-path="${esc(a.root)}">${ic('refresh')}Заново</button></div>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}
       <div class="tabs">${tabs}</div>${part}`;
   }
@@ -1275,21 +1384,32 @@ PAGES.analyze = (m) => {
       const size = sum(a.top.filter((f) => a.sel.has(f.path)), (f) => f.size);
       if (bar) { $('.sum b', bar).textContent = fmtSize(size); $('.sum span', bar).textContent = 'выбрано ' + nFiles(a.sel.size); $('[data-act="topDel"]', bar).disabled = !a.sel.size; }
     },
-    topAll: (el) => { a.sel = el.checked ? new Set(a.top.map((f) => f.path)) : new Set(); render(false); },
+    topAll: (el) => { a.sel = el.checked ? new Set(topList(a).map((f) => f.path)) : new Set(); render(false); },
     topDel: async () => {
       const paths = [...a.sel];
-      const done = await removePaths(paths, sum(a.top.filter((f) => a.sel.has(f.path)), (f) => f.size), 'Анализ диска');
-      if (done) { a.sel = new Set(); await loadAnalysis(a.view.path); }
+      const pool = (a.top || []).concat(a.old || []);
+      const size = sum([...new Map(pool.map((f) => [f.path, f])).values()].filter((f) => a.sel.has(f.path)), (f) => f.size);
+      const done = await removePaths(paths, size, 'Анализ диска');
+      if (done) { a.sel = new Set(); a.old = null; await loadAnalysis(a.view.path); }
     },
+    topScope: (el) => { a.topScope = el.dataset.v; a.topCat = ''; a.sel = new Set(); render(false); },
+    topCat: (el) => { a.topCat = el.dataset.v; a.sel = new Set(); render(false); },
+    grOpen: (el) => { a.tab = 'map'; openDir(el.dataset.path); },
+    export: () => exportDialog(),
+    compress: (el) => compressFolder(el.dataset.path, +el.dataset.size),
   });
   pageHooks.analyze = (s) => {
     const f = $('#anFiles'); if (f) f.textContent = fmtNum(s.files);
     const b = $('#anBytes'); if (b) b.textContent = fmtSize(s.bytes);
     const t = $('#anTime'); if (t) t.textContent = s.elapsed >= 1 ? fmtDur(s.elapsed) : '0 с';
     const c = $('#anCur'); if (c) c.textContent = s.current ? '\u200e' + s.current + '\u200e' : '';
-    const bar = $('#anBar'); if (bar && a && a.diskUsed) bar.style.width = Math.min(99, pct(s.bytes, a.diskUsed)) + '%';
+    const bar = $('#anBar');
+    if (bar && s.total > 0) bar.style.width = Math.min(99, pct(s.done, s.total)) + '%'; // таблица файлов NTFS
+    else if (bar && a && a.diskUsed) bar.style.width = Math.min(99, pct(s.bytes, a.diskUsed)) + '%';
   };
   if (a && a.view && a.tab === 'map' && !a.running && !a.error) { bindTreemap(); drawTreemap(); }
+  const gs = $('#grSel');
+  if (gs) gs.onchange = () => { a.growth = null; loadGrowth(a, gs.value); render(false); };
   if (!a || a.view || a.error) ready(m);
 };
 

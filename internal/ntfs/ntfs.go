@@ -152,6 +152,7 @@ type attr struct {
 	typ      uint32
 	nonRes   bool
 	named    bool
+	name     string // data streams only
 	flags    uint16
 	value    []byte // resident value
 	startVCN int64
@@ -180,6 +181,16 @@ func attrs(rec []byte, fn func(a *attr) bool) {
 		}
 		h := rec[off : off+ln]
 		a := attr{typ: typ, nonRes: h[8] != 0, named: h[9] != 0, flags: binary.LittleEndian.Uint16(h[0x0C:])}
+		if a.named && typ == atData {
+			nl, no := int(h[9]), int(binary.LittleEndian.Uint16(h[0x0A:]))
+			if no+2*nl <= ln {
+				u := make([]uint16, nl)
+				for i := range u {
+					u[i] = binary.LittleEndian.Uint16(h[no+2*i:])
+				}
+				a.name = string(utf16.Decode(u))
+			}
+		}
 		if !a.nonRes {
 			if ln >= 0x18 {
 				vl := int(binary.LittleEndian.Uint32(h[0x10:]))
@@ -363,6 +374,7 @@ type extPart struct {
 	base          uint64
 	hasData       bool
 	size, alloc   int64
+	wofAlloc      int64 // WofCompressedData stream (files compressed by Windows, CompactOS)
 	name          string
 	ns            byte
 	parent        uint64
@@ -420,6 +432,13 @@ func parseRecord(rec []byte, r *Rec) (ext *extPart, inUse bool) {
 			}
 		case atData:
 			if a.named {
+				if a.name == "WofCompressedData" {
+					if !a.nonRes {
+						p.wofAlloc = 0
+					} else if a.startVCN == 0 {
+						p.wofAlloc = a.total
+					}
+				}
 				break
 			}
 			if !a.nonRes {
@@ -446,12 +465,18 @@ func parseRecord(rec []byte, r *Rec) (ext *extPart, inUse bool) {
 	}
 	if p.hasReparseTag {
 		r.Link = p.reparseTag&0x20000000 != 0
+		if p.reparseTag == tagWOF && p.wofAlloc > 0 {
+			r.Alloc = p.wofAlloc // the real data lives in the compressed stream
+		}
 	}
 	if r.Dir {
 		r.Size, r.Alloc = 0, 0
 	}
 	return nil, true
 }
+
+// tagWOF marks files compressed by the Windows Overlay Filter (compact /exe, CompactOS).
+const tagWOF = 0x80000017
 
 // Progress is called from time to time with records read so far.
 type Progress func(done, total int64)
@@ -584,6 +609,9 @@ func (v *Volume) Scan(progress Progress, cancel func() bool) ([]Rec, error) {
 			}
 		}
 		r.Links += e.links
+		if e.wofAlloc > 0 && r.Alloc == 0 && !r.Dir {
+			r.Alloc = e.wofAlloc
+		}
 		if e.name != "" && r.Name == "" {
 			r.Name, r.Parent = e.name, e.parent
 		}
@@ -596,3 +624,21 @@ func (v *Volume) Scan(progress Progress, cancel func() bool) ([]Rec, error) {
 
 // ErrCancelled is returned when Scan was stopped.
 var ErrCancelled = errors.New("остановлено")
+
+// Record reads one base file record by number (a file id's low 48 bits).
+// Data kept in extension records is not followed.
+func (v *Volume) Record(num uint64) (Rec, error) {
+	var r Rec
+	o, ok := v.mftOffset(int64(num) * int64(v.RecordSize))
+	if !ok {
+		return r, errors.New("запись за пределами $MFT")
+	}
+	rec, err := v.readRecordAt(o)
+	if err != nil {
+		return r, err
+	}
+	if ext, inUse := parseRecord(rec, &r); ext != nil || !inUse {
+		return r, errors.New("не основная или свободная запись")
+	}
+	return r, nil
+}

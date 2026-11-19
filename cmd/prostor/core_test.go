@@ -470,3 +470,67 @@ func TestBuildFromMFT(t *testing.T) {
 		t.Fatalf("categories: %+v", a.cats)
 	}
 }
+
+// "What grew": a snapshot after the first analysis, files added, the second
+// analysis compared with it. Growth is shown where it happened, not on every
+// parent folder above it.
+func TestSnapshotGrowth(t *testing.T) {
+	isolate(t)
+	saved := [2]int64{snapMinSize, growthMin}
+	snapMinSize, growthMin = 1<<20, 1<<20
+	t.Cleanup(func() { snapMinSize, growthMin = saved[0], saved[1] })
+	root := t.TempDir()
+	mk := func(rel string, size int) {
+		if err := writeTestFile(filepath.Join(root, rel), size, 30, int64(size)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mk("Games/save.bin", 2<<20)
+	mk("Old/big.iso", 3<<20)
+	analyse := func() *Analysis {
+		a := newAnalysis(root, newTestJob())
+		a.run()
+		id, err := a.saveSnapshot()
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.snapID = id
+		return a
+	}
+	first := analyse()
+	time.Sleep(1100 * time.Millisecond) // snapshot ids have one-second resolution
+	mk("Games/Shooter/Cache/shaders.bin", 5<<20)
+	mk("Downloads/movie.mkv", 4<<20)
+	os.RemoveAll(filepath.Join(root, "Old"))
+	second := analyse()
+
+	list := listSnapshots(root)
+	if len(list) != 2 || list[0].ID != second.snapID || list[1].ID != first.snapID {
+		t.Fatalf("snapshots: %+v", list)
+	}
+	id := defaultSnapshot(list, second.snapID, second.method)
+	if id != first.snapID {
+		t.Fatalf("default snapshot %q, want %q", id, first.snapID)
+	}
+	old, err := loadSnapshot(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := second.growth(old)
+	names := map[string]growthItem{}
+	for _, it := range g.Grew {
+		names[it.Name] = it
+	}
+	if _, ok := names["Cache"]; !ok || len(g.Grew) != 2 {
+		t.Fatalf("grew: %+v", g.Grew)
+	}
+	if d := names["Downloads"]; !d.Added || d.Delta < 4<<20 {
+		t.Fatalf("new folder: %+v", d)
+	}
+	if _, ok := names["Games"]; ok {
+		t.Fatalf("a parent that grew only through its subfolder is listed: %+v", g.Grew)
+	}
+	if len(g.Shrank) != 1 || g.Shrank[0].Name != "Old" || !g.Shrank[0].Gone {
+		t.Fatalf("shrank: %+v", g.Shrank)
+	}
+}

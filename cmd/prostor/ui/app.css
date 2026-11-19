@@ -473,6 +473,21 @@ tr:hover .ra, tr:focus-within .ra, .ra:focus-within { opacity: 1; }
 #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
 .toast { background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 6px; max-width: 420px; font-size: 13px; }
 .toast.err { background: var(--red); color: #fff; }
+.toast.act { display: flex; align-items: center; gap: 14px; }
+.toast.act .linkbtn { color: var(--paper); text-decoration: underline; font-size: 13px; font-weight: 600; flex: none; }
+/* анализ: фильтры крупных файлов и «что выросло» */
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-bottom: 16px; }
+.filters .chip { height: 30px; font-size: 13px; }
+.filters .chip.on { background: var(--klein-tint); color: var(--klein); border-color: transparent; font-weight: 600; }
+.filters .chip svg.i { width: 16px; height: 16px; }
+.gr-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.gr-total { display: grid; gap: 4px; }
+.gr-total b { font: 400 34px/1 var(--f-num); font-variant-numeric: tabular-nums; }
+.gr-total span { color: var(--ink-2); font-size: 13px; }
+.gr-sel { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-3); }
+.gr-sel .input { min-width: 300px; }
+.gr-up { color: var(--klein); }
+.gr-down { color: var(--ink-2); }
 
 .offline { position: fixed; inset: 0; z-index: 100; background: var(--paper); display: grid; place-items: center; text-align: center; }
 .offline h2 { font: 600 20px var(--f-head); margin-top: 14px; }

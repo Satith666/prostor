@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"prostor/internal/ntfs"
 	"prostor/internal/winapi"
 )
 
@@ -98,8 +99,8 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 		// the walk counts the second hard link again (outside Windows), MFT once
 		wantFiles, wantSize := w.root.files-1, w.root.size-linkAlloc
 		if mFiles != wantFiles || mSize != wantSize {
-			return failf("MFT: %d файлов, %s; обход: %d файлов, %s (жёсткая ссылка %s)",
-				mFiles, human(mSize), w.root.files, human(w.root.size), human(linkAlloc))
+			return failf("MFT: %d файлов, %d байт; обход без второй жёсткой ссылки: %d файлов, %d байт. По файлам (обход / запись MFT): %s",
+				mFiles, mSize, wantFiles, wantSize, mftFileDiffs(dir))
 		}
 		return okf("%d файлов, %s — как при обходе; жёсткая ссылка учтена один раз, поток данных и ссылка на папку не посчитаны", mFiles, human(mSize))
 	})
@@ -149,4 +150,41 @@ func pctDiff(a, b int64) float64 {
 		d = -d
 	}
 	return d
+}
+
+// mftFileDiffs compares every test file's size on disk as the folder listing
+// reports it with the file's own MFT record.
+func mftFileDiffs(dir string) string {
+	r, closeVol, err := winapi.OpenVolume(filepath.VolumeName(dir) + `\`)
+	if err != nil {
+		return err.Error()
+	}
+	defer closeVol()
+	v, err := ntfs.Open(r)
+	if err != nil {
+		return err.Error()
+	}
+	var out []string
+	var walk func(d string)
+	walk = func(d string) {
+		ents, _ := winapi.ReadDir(d)
+		for _, e := range ents {
+			p := filepath.Join(d, e.Name)
+			if e.Link {
+				continue
+			}
+			if e.IsDir {
+				walk(p)
+				continue
+			}
+			rec, err := v.Record(e.ID & 0xFFFFFFFFFFFF)
+			mark := ""
+			if err != nil || rec.Alloc != e.Alloc {
+				mark = " ≠"
+			}
+			out = append(out, fmt.Sprintf("%s %d/%d (размер %d/%d)%s", e.Name, e.Alloc, rec.Alloc, e.Size, rec.Size, mark))
+		}
+	}
+	walk(dir)
+	return strings.Join(out, "; ")
 }

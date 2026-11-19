@@ -65,6 +65,8 @@ type Analysis struct {
 	treeMu sync.RWMutex // guards the finished tree against deletions
 	top    topHeap
 	topMin atomic.Int64
+	old    topHeap // biggest files not changed for more than a year
+	oldMin atomic.Int64
 	cats   map[string]*stat
 	exts   map[string]*stat
 	ages   [5]stat
@@ -86,6 +88,7 @@ type Analysis struct {
 	done   bool
 	took   float64
 	method string // "mft" — read from the NTFS file table, "walk" — folder by folder
+	snapID string // snapshot saved after this analysis
 }
 
 type linkShard struct {
@@ -309,9 +312,10 @@ func (a *Analysis) scanDir(t walkTask) []walkTask {
 	cats := map[string]*local{}
 	exts := map[string]*local{}
 	var ages [5]local
-	var tops []fileRec
+	var tops, olds []fileRec
 	var next []walkTask
 	min := a.topMin.Load()
+	oldMin := a.oldMin.Load()
 	for _, e := range ents {
 		if e.Link {
 			continue
@@ -330,7 +334,7 @@ func (a *Analysis) scanDir(t walkTask) []walkTask {
 		if e.Attr&attrCloudMask != 0 && e.Alloc < e.Size {
 			a.cloud.Add(e.Size - e.Alloc)
 		}
-		if n.sys && e.ID != 0 && size > 0 && !a.firstLink(e.ID) {
+		if n.sys && e.ID != 0 && !a.firstLink(e.ID) {
 			a.hardlinks.Add(size)
 			continue // another hard link of an already counted file
 		}
@@ -361,6 +365,9 @@ func (a *Analysis) scanDir(t walkTask) []walkTask {
 		ages[b].count++
 		if size > min {
 			tops = append(tops, fileRec{Path: filepath.Join(t.path, e.Name), Size: size, MTime: e.MTime, Cat: cat})
+		}
+		if size > oldMin && e.MTime > 0 && a.now-e.MTime > oldAge {
+			olds = append(olds, fileRec{Path: filepath.Join(t.path, e.Name), Size: size, MTime: e.MTime, Cat: cat})
 		}
 	}
 	a.job.Files.Add(n.ownFiles)
@@ -401,8 +408,27 @@ func (a *Analysis) scanDir(t walkTask) []walkTask {
 	if len(a.top) >= topN {
 		a.topMin.Store(a.top[0].Size)
 	}
+	for _, r := range olds {
+		a.pushOld(r)
+	}
 	a.mu.Unlock()
 	return next
+}
+
+// oldAge: files not changed for this long are offered in "not used for a year".
+const oldAge = 365 * 86400
+
+// pushOld adds a candidate to the list of big old files (a.mu held).
+func (a *Analysis) pushOld(r fileRec) {
+	if len(a.old) < topN {
+		heap.Push(&a.old, r)
+	} else if r.Size > a.old[0].Size {
+		a.old[0] = r
+		heap.Fix(&a.old, 0)
+	}
+	if len(a.old) >= topN {
+		a.oldMin.Store(a.old[0].Size)
+	}
 }
 
 // finalize adds up folder totals bottom-up and sorts every folder's children.
@@ -671,10 +697,19 @@ func (a *Analysis) topFiles() []fileRec {
 	return out
 }
 
+func (a *Analysis) oldFiles() []fileRec {
+	a.mu.Lock()
+	out := append([]fileRec(nil), a.old...)
+	a.mu.Unlock()
+	sort.Slice(out, func(i, j int) bool { return out[i].Size > out[j].Size })
+	return out
+}
+
 func (a *Analysis) summary() map[string]any {
 	return map[string]any{"root": a.Root, "size": a.root.size, "files": a.root.files, "dirs": a.root.dirs,
 		"took": a.took, "denied": a.denied.Load(), "hardlinks": a.hardlinks.Load(), "other": a.other,
-		"isDrive": a.isDrive, "diskTotal": a.diskTotal, "diskUsed": a.diskUsed, "method": a.method}
+		"isDrive": a.isDrive, "diskTotal": a.diskTotal, "diskUsed": a.diskUsed, "method": a.method,
+		"snapshots": len(listSnapshots(a.Root))}
 }
 
 // forget updates the tree after a file or folder was deleted.
@@ -727,7 +762,37 @@ func (a *Analysis) forget(path string, size int64, isDir bool) {
 	}
 	a.top = kept
 	heap.Init(&a.top)
+	keptOld := a.old[:0]
+	for _, f := range a.old {
+		lf := lower(f.Path)
+		if lf == lp || strings.HasPrefix(lf, lp+string(filepath.Separator)) {
+			continue
+		}
+		keptOld = append(keptOld, f)
+	}
+	a.old = keptOld
+	heap.Init(&a.old)
 	a.mu.Unlock()
+}
+
+// resize changes a folder's size after something inside it shrank (compression).
+func (a *Analysis) resize(path string, delta int64) {
+	a.treeMu.Lock()
+	defer a.treeMu.Unlock()
+	n := a.find(path)
+	if n == nil {
+		return
+	}
+	n.own += delta
+	if n.own < 0 {
+		n.own = 0
+	}
+	for x := n; x != nil; x = x.parent {
+		x.size += delta
+		if x.parent != nil {
+			sortNodes(x.parent.children)
+		}
+	}
 }
 
 func normalizeRoot(path string) string {
@@ -753,6 +818,11 @@ func startAnalysis(path string) error {
 		a.run()
 		if j.Cancelled() {
 			return nil, errors.New("анализ остановлен")
+		}
+		if id, err := a.saveSnapshot(); err == nil {
+			a.snapID = id
+		} else {
+			log.Printf("snapshot: %v", err)
 		}
 		return a.summary(), nil
 	})

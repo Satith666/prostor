@@ -244,7 +244,75 @@ func routes() http.Handler {
 			writeErr(w, errors.New("нет результатов анализа"))
 			return
 		}
+		if r.URL.Query().Get("old") == "1" {
+			writeJSON(w, a.oldFiles())
+			return
+		}
 		writeJSON(w, a.topFiles())
+	})
+	// what grew since an earlier snapshot of the same place
+	get("/api/analyze/growth", func(w http.ResponseWriter, r *http.Request) {
+		a := currentAnalysis()
+		if a == nil {
+			writeErr(w, errors.New("нет результатов анализа"))
+			return
+		}
+		all := listSnapshots(a.Root)
+		var list []snapInfo
+		for _, s := range all {
+			if s.ID != a.snapID {
+				list = append(list, s)
+			}
+		}
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			id = defaultSnapshot(all, a.snapID, a.method)
+		}
+		if id == "" {
+			writeJSON(w, map[string]any{"none": true, "snapshots": []snapInfo{}})
+			return
+		}
+		old, err := loadSnapshot(a.Root, id)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		res := a.growth(old)
+		res.Snapshots = list
+		for _, s := range all {
+			if s.ID == id {
+				res.Snapshot = s
+			}
+		}
+		writeJSON(w, res)
+	})
+	post("/api/analyze/export", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ What, Format string }
+		readJSON(r, &req)
+		a := currentAnalysis()
+		if a == nil {
+			writeErr(w, errors.New("нет результатов анализа"))
+			return
+		}
+		p, err := a.export(req.What, req.Format)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]string{"path": p})
+	})
+	post("/api/fs/compress", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Path string }
+		readJSON(r, &req)
+		if err := compressAllowed(req.Path); err != nil {
+			writeErr(w, err)
+			return
+		}
+		if _, err := startJob("compress", func(j *Job) (any, error) { return compressFolder(j, req.Path) }); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
 	})
 	get("/api/analyze/types", func(w http.ResponseWriter, r *http.Request) {
 		a := currentAnalysis()

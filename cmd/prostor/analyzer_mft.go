@@ -150,7 +150,7 @@ func (a *Analysis) buildFromMFT(recs []ntfs.Rec) {
 	cats := map[string]*stat{}
 	exts := map[string]*stat{}
 	var ages [5]stat
-	var top mftHeap
+	var top, old mftHeap
 	var files, bytes int64
 	for i := ntfs.FirstUser; i < n; i++ {
 		r := &recs[i]
@@ -202,6 +202,14 @@ func (a *Analysis) buildFromMFT(recs []ntfs.Rec) {
 			top[0] = mftTop{nd, r.Name, size, r.MTime, cat}
 			heap.Fix(&top, 0)
 		}
+		if r.MTime > 0 && a.now-r.MTime > oldAge {
+			if len(old) < topN {
+				heap.Push(&old, mftTop{nd, r.Name, size, r.MTime, cat})
+			} else if size > old[0].size {
+				old[0] = mftTop{nd, r.Name, size, r.MTime, cat}
+				heap.Fix(&old, 0)
+			}
+		}
 	}
 	a.mu.Lock()
 	a.cats, a.exts, a.ages = cats, exts, ages
@@ -212,6 +220,10 @@ func (a *Analysis) buildFromMFT(recs []ntfs.Rec) {
 	heap.Init(&a.top)
 	if len(a.top) >= topN {
 		a.topMin.Store(a.top[0].Size)
+	}
+	a.old = a.old[:0]
+	for _, t := range old {
+		a.pushOld(fileRec{Path: filepath.Join(a.nodePath(t.node), t.name), Size: t.size, MTime: t.mtime, Cat: t.cat})
 	}
 	a.mu.Unlock()
 	a.job.Files.Store(files)

@@ -34,6 +34,7 @@ type fileSpec struct {
 	nonRes   *[3]int64 // size, alloc, total(compressed; 0 = same as alloc)
 	reparse  uint32
 	corrupt  bool
+	wof      int64 // allocation of a WofCompressedData stream
 }
 
 func u16s(s string) []byte {
@@ -153,6 +154,25 @@ func (m *img) record(f fileSpec, mftRuns []run) []byte {
 		}
 		body = append(body, nonResident(atData, encodeRuns([]run{{vcn: 0, n: 1, lcn: 100}}), f.nonRes[0], f.nonRes[1], f.nonRes[2], fl)...)
 	}
+	if f.wof > 0 {
+		h := nonResident(atData, encodeRuns([]run{{vcn: 0, n: 1, lcn: 100}}), f.wof*3, f.wof, 0, 0)
+		// name the stream: grow the header to hold "WofCompressedData"
+		name := u16s("WofCompressedData")
+		hl := int(binary.LittleEndian.Uint16(h[0x20:]))
+		runsPart := append([]byte(nil), h[hl:]...)
+		nh := make([]byte, 0, len(h)+len(name)+8)
+		nh = append(nh, h[:hl]...)
+		nh = append(nh, name...)
+		nh = append(nh, runsPart...)
+		for len(nh)%8 != 0 {
+			nh = append(nh, 0)
+		}
+		binary.LittleEndian.PutUint32(nh[4:], uint32(len(nh)))
+		nh[9] = byte(len(name) / 2)
+		binary.LittleEndian.PutUint16(nh[0x0A:], uint16(hl))
+		binary.LittleEndian.PutUint16(nh[0x20:], uint16(hl+len(name)))
+		body = append(body, nh...)
+	}
 	if f.reparse != 0 {
 		v := make([]byte, 8)
 		binary.LittleEndian.PutUint32(v, f.reparse)
@@ -228,6 +248,7 @@ func sample() []fileSpec {
 		{num: 24, inUse: true, base: 23, nonRes: &[3]int64{50000, 53248, 20480}},
 		{num: 25, inUse: true, names: []fname{{16, "broken.bin", 3}}, resident: []byte("zz"), corrupt: true},
 		{num: 26, inUse: true, names: []fname{{16, "cloud.docx", 3}}, nonRes: &[3]int64{900000, 0, 0}, reparse: 0x9000001A, attr: 0x400420},
+		{num: 27, inUse: true, names: []fname{{16, "compact.dll", 3}}, nonRes: &[3]int64{300000, 0, 0}, reparse: tagWOF, wof: 98304},
 	}
 }
 
@@ -269,6 +290,9 @@ func check(t *testing.T, recs []Rec) {
 	}
 	if r := get(26); r.Link || r.Size != 900000 || r.Alloc != 0 {
 		t.Errorf("cloud placeholder: %+v", r)
+	}
+	if r := get(27); r.Link || r.Size != 300000 || r.Alloc != 98304 {
+		t.Errorf("file compressed by Windows (WOF): %+v", r)
 	}
 }
 
@@ -328,5 +352,20 @@ func TestDecodeRuns(t *testing.T) {
 func TestNotNTFS(t *testing.T) {
 	if _, err := Open(bytes.NewReader(make([]byte, 4096))); err == nil {
 		t.Fatal("an empty image opened as NTFS")
+	}
+}
+
+func TestRecord(t *testing.T) {
+	runs := []run{{vcn: 0, n: 4, lcn: 40}, {vcn: 4, n: 8, lcn: 8}}
+	v, err := Open(bytes.NewReader(build(4096, runs, sample())))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := v.Record(18)
+	if err != nil || r.Name != "big.bin" || r.Alloc != 12288 {
+		t.Fatalf("record 18: %+v %v", r, err)
+	}
+	if _, err := v.Record(24); err == nil {
+		t.Fatal("an extension record read as a file")
 	}
 }
