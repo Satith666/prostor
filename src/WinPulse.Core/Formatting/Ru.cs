@@ -10,42 +10,46 @@ public static class Ru
     private const double GB = MB * 1024;
     private const double TB = GB * 1024;
 
-    public static CultureInfo Culture { get; } = CultureInfo.GetCultureInfo("ru-RU");
+    private static readonly CultureInfo RuCulture = CultureInfo.GetCultureInfo("ru-RU");
+    private static readonly CultureInfo EnCulture = CultureInfo.GetCultureInfo("en-US");
+
+    /// <summary>Культура чисел по языку интерфейса: «1,2» по-русски, «1.2» по-английски.</summary>
+    public static CultureInfo Culture => Lang.English ? EnCulture : RuCulture;
 
     public static string Bytes(double bytes)
     {
         double a = Math.Abs(bytes);
-        if (a >= TB) return Num(bytes / TB, 100) + " ТБ";
-        if (a >= GB) return Num(bytes / GB, 100) + " ГБ";
-        if (a >= MB) return Num(bytes / MB, 10) + " МБ";
-        if (a >= KB) return Num(bytes / KB, 10) + " КБ";
-        return bytes.ToString("0", Culture) + " Б";
+        if (a >= TB) return Num(bytes / TB, 100) + Lang.T(" ТБ", " TB");
+        if (a >= GB) return Num(bytes / GB, 100) + Lang.T(" ГБ", " GB");
+        if (a >= MB) return Num(bytes / MB, 10) + Lang.T(" МБ", " MB");
+        if (a >= KB) return Num(bytes / KB, 10) + Lang.T(" КБ", " KB");
+        return bytes.ToString("0", Culture) + Lang.T(" Б", " B");
     }
 
-    public static string Rate(double bytesPerSecond) => Bytes(bytesPerSecond) + "/с";
+    public static string Rate(double bytesPerSecond) => Bytes(bytesPerSecond) + Lang.T("/с", "/s");
 
     /// <summary>Сетевая скорость: принимает байты в секунду, показывает биты.</summary>
     public static string Bits(double bytesPerSecond)
     {
         double bits = bytesPerSecond * 8;
-        if (bits >= 1e9) return Num(bits / 1e9, 10) + " Гбит/с";
-        if (bits >= 1e6) return Num(bits / 1e6, 10) + " Мбит/с";
-        return (bits / 1e3).ToString("0", Culture) + " Кбит/с";
+        if (bits >= 1e9) return Num(bits / 1e9, 10) + Lang.T(" Гбит/с", " Gbps");
+        if (bits >= 1e6) return Num(bits / 1e6, 10) + Lang.T(" Мбит/с", " Mbps");
+        return (bits / 1e3).ToString("0", Culture) + Lang.T(" Кбит/с", " Kbps");
     }
 
     public static string Percent(double value) => value.ToString("0", Culture) + "%";
 
     public static string Percent1(double value) => value.ToString("0.0", Culture) + "%";
 
-    public static string GHz(double mhz) => (mhz / 1000.0).ToString("0.0", Culture) + " ГГц";
+    public static string GHz(double mhz) => (mhz / 1000.0).ToString("0.0", Culture) + Lang.T(" ГГц", " GHz");
 
-    public static string Ms(double ms) => ms < 10 ? ms.ToString("0.0", Culture) + " мс" : ms.ToString("0", Culture) + " мс";
+    public static string Ms(double ms) => ms < 10 ? ms.ToString("0.0", Culture) + Lang.T(" мс", " ms") : ms.ToString("0", Culture) + Lang.T(" мс", " ms");
 
     public static string Duration(TimeSpan t)
     {
-        if (t.TotalDays >= 1) return $"{(int)t.TotalDays} д {t.Hours} ч";
-        if (t.TotalHours >= 1) return $"{(int)t.TotalHours} ч {t.Minutes} мин";
-        return $"{Math.Max(0, (int)t.TotalMinutes)} мин";
+        if (t.TotalDays >= 1) return Lang.T($"{(int)t.TotalDays} д {t.Hours} ч", $"{(int)t.TotalDays} d {t.Hours} h");
+        if (t.TotalHours >= 1) return Lang.T($"{(int)t.TotalHours} ч {t.Minutes} мин", $"{(int)t.TotalHours} h {t.Minutes} min");
+        return Lang.T($"{Math.Max(0, (int)t.TotalMinutes)} мин", $"{Math.Max(0, (int)t.TotalMinutes)} min");
     }
 
     /// <summary>Склонение: Plural(5, "процесс", "процесса", "процессов") → «процессов».</summary>
