@@ -3,6 +3,7 @@ package main
 import (
 	"container/heap"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -80,10 +81,11 @@ type Analysis struct {
 	diskUsed  int64
 	other     int64 // used space the scan could not see (system metadata, no access)
 
-	job  *Job
-	now  int64
-	done bool
-	took float64
+	job    *Job
+	now    int64
+	done   bool
+	took   float64
+	method string // "mft" — read from the NTFS file table, "walk" — folder by folder
 }
 
 type linkShard struct {
@@ -204,6 +206,25 @@ type walkTask struct {
 
 func (a *Analysis) run() {
 	start := time.Now()
+	if a.mftPossible() {
+		err := a.runMFT()
+		if err == nil {
+			a.method = "mft"
+			a.finish(start)
+			return
+		}
+		if a.job.Cancelled() {
+			a.finish(start)
+			return
+		}
+		log.Printf("mft %s: %v, falling back to the walk", a.Root, err)
+		a.job.Done.Store(0)
+		a.job.Total.Store(0)
+		a.job.Files.Store(0)
+		a.job.Bytes.Store(0)
+		a.job.SetPhase("Сканирование " + a.Root)
+	}
+	a.method = "walk"
 	var (
 		mu      sync.Mutex
 		cond    = sync.NewCond(&mu)
@@ -252,6 +273,10 @@ func (a *Analysis) run() {
 		}()
 	}
 	wg.Wait()
+	a.finish(start)
+}
+
+func (a *Analysis) finish(start time.Time) {
 	a.finalize()
 	a.took = time.Since(start).Seconds()
 	if a.isDrive && a.diskUsed > a.root.size {
@@ -649,7 +674,7 @@ func (a *Analysis) topFiles() []fileRec {
 func (a *Analysis) summary() map[string]any {
 	return map[string]any{"root": a.Root, "size": a.root.size, "files": a.root.files, "dirs": a.root.dirs,
 		"took": a.took, "denied": a.denied.Load(), "hardlinks": a.hardlinks.Load(), "other": a.other,
-		"isDrive": a.isDrive, "diskTotal": a.diskTotal, "diskUsed": a.diskUsed}
+		"isDrive": a.isDrive, "diskTotal": a.diskTotal, "diskUsed": a.diskUsed, "method": a.method}
 }
 
 // forget updates the tree after a file or folder was deleted.

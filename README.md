@@ -20,10 +20,10 @@
 Нужны Go 1.24+ и Python 3 с Pillow (Windows, Linux или macOS):
 
 ```
-VER=1.3.0 ./build.sh
+VER=1.4.0 ./build.sh
 ```
 
-Результат — `build/Prostor.exe` (можно запускать без установки) и `build/Prostor-Setup-1.3.0.exe`.
+Результат — `build/Prostor.exe` (можно запускать без установки) и `build/Prostor-Setup-1.4.0.exe`.
 
 ## Как устроена безопасность удаления
 - Кэш и временные файлы удаляются сразу; каждый удалённый файл записывается в журнал (раздел «История» → «Файлы»).
@@ -57,5 +57,5 @@ VER=1.3.0 ./build.sh
 ## Полезное
 - Журнал работы: `%LOCALAPPDATA%\Prostor\prostor.log`
 - Настройки и история: `%LOCALAPPDATA%\Prostor\settings.json`, `history.json`
-- Тихая установка: `Prostor-Setup-1.3.0.exe /S` (папку можно задать `/D=C:\Путь`)
+- Тихая установка: `Prostor-Setup-1.4.0.exe /S` (папку можно задать `/D=C:\Путь`)
 - Удаление: «Параметры → Приложения» или `Prostor.exe --uninstall`

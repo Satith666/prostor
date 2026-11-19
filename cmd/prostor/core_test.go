@@ -9,9 +9,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"prostor/internal/ntfs"
 	"prostor/internal/rules"
 	"strings"
 	"testing"
+	"time"
 )
 
 // isolate points every folder the program uses at a temporary directory.
@@ -419,5 +421,52 @@ func TestImportedRulesExercised(t *testing.T) {
 	}
 	if n != rulesInfo.Imported {
 		t.Fatalf("loaded %d of %d imported rules", n, rulesInfo.Imported)
+	}
+}
+
+// The MFT path builds the same tree as the walk: folders by parent record,
+// NTFS metadata and links left out, hard links counted once.
+func TestBuildFromMFT(t *testing.T) {
+	recs := make([]ntfs.Rec, 40)
+	recs[ntfs.RecRoot] = ntfs.Rec{Dir: true, Name: ".", Parent: ntfs.RecRoot}
+	recs[ntfs.RecExtend] = ntfs.Rec{Dir: true, Name: "$Extend", Parent: ntfs.RecRoot}
+	recs[2] = ntfs.Rec{Name: "$LogFile", Parent: ntfs.RecRoot, Alloc: 64 << 20}
+	recs[16] = ntfs.Rec{Dir: true, Name: "Users", Parent: ntfs.RecRoot}
+	recs[17] = ntfs.Rec{Dir: true, Name: "Ann", Parent: 16}
+	recs[18] = ntfs.Rec{Name: "video.mp4", Parent: 17, Size: 5000, Alloc: 8192, MTime: time.Now().Unix()}
+	recs[19] = ntfs.Rec{Name: "notes.txt", Parent: 17, Size: 100, Alloc: 0}
+	recs[20] = ntfs.Rec{Name: "shared.dll", Parent: 16, Size: 4096, Alloc: 4096, Links: 3}
+	recs[21] = ntfs.Rec{Dir: true, Name: "Link", Parent: 17, Link: true}
+	recs[22] = ntfs.Rec{Name: "behind-link.bin", Parent: 21, Alloc: 1 << 20}
+	recs[23] = ntfs.Rec{Dir: true, Name: "$Deleted", Parent: ntfs.RecExtend}
+	recs[24] = ntfs.Rec{Name: "journal", Parent: 23, Alloc: 32 << 20}
+	recs[25] = ntfs.Rec{Name: "orphan.bin", Parent: 39, Alloc: 1 << 20} // parent record is unused
+	recs[26] = ntfs.Rec{Dir: true, Name: "LoopA", Parent: 27}
+	recs[27] = ntfs.Rec{Dir: true, Name: "LoopB", Parent: 26} // a corrupt cycle
+	recs[28] = ntfs.Rec{Name: "cloud.docx", Parent: 17, Size: 900000, Alloc: 0, Attr: attrRecallData}
+	recs[29] = ntfs.Rec{Name: "root.sys", Parent: ntfs.RecRoot, Size: 1 << 30, Alloc: 1 << 30}
+
+	a := newAnalysis(t.TempDir(), newTestJob())
+	a.buildFromMFT(recs)
+	a.finalize()
+	if a.root.files != 5 || a.root.size != 8192+4096+(1<<30) {
+		t.Fatalf("root: %d files, %d bytes", a.root.files, a.root.size)
+	}
+	if len(a.root.children) != 1 || a.root.children[0].name != "Users" {
+		t.Fatalf("root folders: %+v", a.root.children)
+	}
+	users := a.root.children[0]
+	if len(users.children) != 1 || users.children[0].name != "Ann" || users.children[0].files != 3 || users.children[0].size != 8192 {
+		t.Fatalf("Users: %+v", users.children[0])
+	}
+	if a.hardlinks.Load() != 2*4096 || a.cloud.Load() != 900000 {
+		t.Fatalf("hard links %d, cloud %d", a.hardlinks.Load(), a.cloud.Load())
+	}
+	top := a.topFiles()
+	if len(top) != 5 || top[0].Path != filepath.Join(a.Root, "root.sys") || top[1].Path != filepath.Join(a.Root, "Users", "Ann", "video.mp4") {
+		t.Fatalf("top files: %+v", top)
+	}
+	if a.cats["video"] == nil || a.cats["video"].Size != 8192 {
+		t.Fatalf("categories: %+v", a.cats)
 	}
 }

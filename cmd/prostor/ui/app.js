@@ -1243,14 +1243,14 @@ PAGES.analyze = (m) => {
       .map(([id, n]) => `<button class="${a.tab === id ? 'on' : ''}" data-act="tab" data-tab="${id}">${n}</button>`).join('');
     const notes = [];
     if (sm.other > 0) notes.push(`<span title="Служебные данные файловой системы и папки без доступа">${ic('info')}служебные и недоступные данные: ${fmtSize(sm.other)}</span>`);
-    if (t.hardlinks > 0) notes.push(`<span title="Системные файлы Windows, доступные по нескольким путям, посчитаны один раз">${ic('layers')}общие файлы Windows учтены один раз: ${fmtSize(t.hardlinks)}</span>`);
+    if (t.hardlinks > 0) notes.push(`<span title="Файлы, доступные по нескольким путям (жёсткие ссылки, в основном системные файлы Windows), посчитаны один раз">${ic('layers')}${sm.method === 'mft' ? 'файлы с несколькими путями' : 'общие файлы Windows'} учтены один раз: ${fmtSize(t.hardlinks)}</span>`);
     if (t.cloud > 0) notes.push(`<span title="Файлы OneDrive и других облаков, которые хранятся только в облаке">${ic('download')}только в облаке: ${fmtSize(t.cloud)}</span>`);
     if (t.denied > 0) notes.push(`<span>${ic('shield')}нет доступа к ${fmtNum(t.denied)} ${plural(t.denied, 'папке', 'папкам', 'папкам')}</span>`);
     let part;
     if (a.tab === 'top') part = topHTML(a);
     else if (a.tab === 'types') part = typesHTML(a);
     else part = `<div id="tmPart">${mapHTML(a)}</div>`;
-    body = `<div class="an-sum"><b>${fmtSize(sm.size)}</b><span class="muted">${nFiles(sm.files || 0)} в ${fmtNum(sm.dirs || 0)} ${plural(sm.dirs || 0, 'папке', 'папках', 'папках')}, анализ занял ${fmtDur(sm.took)}</span>
+    body = `<div class="an-sum"><b>${fmtSize(sm.size)}</b><span class="muted">${nFiles(sm.files || 0)} в ${fmtNum(sm.dirs || 0)} ${plural(sm.dirs || 0, 'папке', 'папках', 'папках')}, анализ занял ${fmtDur(sm.took)}${sm.method === 'mft' ? ' (прочитана таблица файлов NTFS)' : ''}</span>
         <span class="spacer"></span><button class="btn sm" data-act="start" data-path="${esc(a.root)}">${ic('refresh')}Заново</button></div>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}
       <div class="tabs">${tabs}</div>${part}`;

@@ -787,11 +787,14 @@ func (t *selfTest) analyzerChecks() {
 		return okf("повтор %s не посчитан второй раз", human(dedup.hardlinks.Load()))
 	})
 
-	if t.quick {
+	d, ok := systemDriveInfo()
+	// MFT reading is fast, so with it the system drive is analysed in the quick mode too
+	mft := ok && (&Analysis{Root: normalizeRoot(d.Root), isDrive: true}).mftPossible()
+	if t.quick && !mft {
 		t.check(g, "Анализ системного диска", func() (string, string) { return skipf("быстрый режим (--quick)") })
 		return
 	}
-	d, ok := systemDriveInfo()
+	mftDir, mftLinked, mftSetup := t.mftTestTree()
 	t.check(g, "Анализ системного диска", func() (string, string) {
 		if !ok {
 			return failf("системный диск не найден")
@@ -822,8 +825,12 @@ func (t *selfTest) analyzerChecks() {
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
 		used := a.diskUsed
-		msg := fmt.Sprintf("%s в %d файлах за %s, служебное и недоступное %s, папок без доступа %d, память %s",
-			human(a.root.size), a.root.files, secRu(a.took), human(a.other), a.denied.Load(), human(int64(ms.Sys)))
+		how := "обходом папок"
+		if a.method == "mft" {
+			how = "из таблицы файлов NTFS (MFT)"
+		}
+		msg := fmt.Sprintf("%s в %d файлах за %s %s, служебное и недоступное %s, папок без доступа %d, память %s",
+			human(a.root.size), a.root.files, secRu(a.took), how, human(a.other), a.denied.Load(), human(int64(ms.Sys)))
 		if a.hardlinks.Load() > 0 {
 			msg += fmt.Sprintf(", общие файлы Windows учтены один раз (%s)", human(a.hardlinks.Load()))
 		}
@@ -871,6 +878,7 @@ func (t *selfTest) analyzerChecks() {
 		}
 		return okf("%d элементов в корне, сумма совпадает с итогом", len(v.Items))
 	})
+	t.mftChecks(mft, mftDir, mftLinked, mftSetup)
 }
 
 // ---------------------------------------------------------------- дубликаты
