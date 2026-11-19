@@ -121,6 +121,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Add("lab", "nav.lab", "Icon.Lab", Games, "nav.games");
         Add("hardware", "nav.hardware", "Icon.Chip", new FixModuleViewModel("hardware", new WinPulse.Optimizer.Hardware.HardwareModule(),
             "hw.title", "hw.subtitle", "hw.summary", usesGame: false, settings, LastGpuByPid));
+        Add("nvidia", "nav.nvidia", "Icon.Gpu", new FixModuleViewModel("nvidia", new WinPulse.Optimizer.Nvidia.NvidiaModule(),
+            "nv.title", "nv.subtitle", "nv.summary", usesGame: true, settings, LastGpuByPid));
         Add("windowed", "nav.windowed", "Icon.Game", Windowed);
         Add("problems", "nav.problems", "Icon.Problems", Problems, "nav.system");
         Add("optimize", "nav.optimize", "Icon.Optimize", Optimization);

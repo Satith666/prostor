@@ -18,6 +18,8 @@ public enum ChangeKind
     DisplayAttach,
     /// <summary>Включить или отключить задание Планировщика (Data: "1" / "0").</summary>
     TaskEnabled,
+    /// <summary>Настройка драйвера NVIDIA в профиле игры (или в глобальном профиле). NvValue = null — вернуть значение по умолчанию.</summary>
+    NvidiaSetting,
 }
 
 public enum RegHive { CurrentUser, LocalMachine }
@@ -47,6 +49,12 @@ public sealed class Change
 
     // Задание Планировщика
     public string? TaskPath { get; set; }
+
+    // Драйвер NVIDIA: exe игры (null — глобальный профиль), код настройки и значение
+    public string? NvApp { get; set; }
+    public string? NvAppName { get; set; }
+    public uint NvSettingId { get; set; }
+    public uint? NvValue { get; set; }
 
     // Монитор
     public string? DeviceName { get; set; }
@@ -88,6 +96,7 @@ public sealed class Change
         ChangeKind.DisplayRefresh => ("display:" + DeviceName).ToLowerInvariant(),
         ChangeKind.DisplayAttach => ("detach:" + DeviceName).ToLowerInvariant(),
         ChangeKind.TaskEnabled => ("task:" + TaskPath).ToLowerInvariant(),
+        ChangeKind.NvidiaSetting => ($"nv:{NvApp ?? "global"}:{NvSettingId:X8}").ToLowerInvariant(),
         _ => "",
     };
 
@@ -101,6 +110,7 @@ public sealed class Change
         ChangeKind.PowerActivate or ChangeKind.PowerDelete => "powercfg " + (SchemeGuid ?? ""),
         ChangeKind.DisplayRefresh or ChangeKind.DisplayAttach => DeviceName ?? "",
         ChangeKind.TaskEnabled => "Планировщик заданий → " + (TaskPath ?? ""),
+        ChangeKind.NvidiaSetting => $"NVIDIA DRS → {(NvApp ?? "Global")} → 0x{NvSettingId:X8}",
         _ => "",
     };
 }

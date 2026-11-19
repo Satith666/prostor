@@ -65,6 +65,13 @@ public static class ChangeApplier
                     break;
                 }
 
+                case ChangeKind.NvidiaSetting:
+                {
+                    string? error = WinPulse.Collectors.Gpu.NvidiaDrs.Write(c.NvApp, c.NvAppName, c.NvSettingId, c.NvValue);
+                    if (error is not null) return Fail(result, error);
+                    break;
+                }
+
                 case ChangeKind.TaskEnabled:
                 {
                     string? error = ScheduledTasks.SetEnabled(c.TaskPath ?? "", c.Data == "1");

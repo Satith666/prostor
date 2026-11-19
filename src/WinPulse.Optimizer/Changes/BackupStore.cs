@@ -32,6 +32,10 @@ public sealed class BackupEntry
 
     public string? TaskPath { get; set; }
 
+    public string? NvApp { get; set; }
+    public string? NvAppName { get; set; }
+    public uint NvSettingId { get; set; }
+
     public string? DeviceName { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
@@ -183,6 +187,18 @@ public sealed class BackupStore
                 entry.Width = monitor.Width;
                 entry.Height = monitor.Height;
                 entry.Frequency = monitor.RefreshHz;
+                break;
+            }
+            case ChangeKind.NvidiaSetting:
+            {
+                // Сохраняем значение, заданное именно в этом профиле; «не задано» → при откате вернём значение по умолчанию.
+                entry.Kind = "nvidia";
+                var (found, value) = WinPulse.Collectors.Gpu.NvidiaDrs.ReadLocal(c.NvApp, c.NvSettingId);
+                entry.Existed = found && value is not null;
+                entry.Data = value?.ToString();
+                entry.NvApp = c.NvApp;
+                entry.NvAppName = c.NvAppName;
+                entry.NvSettingId = c.NvSettingId;
                 break;
             }
             case ChangeKind.TaskEnabled:

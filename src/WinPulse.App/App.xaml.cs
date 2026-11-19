@@ -163,7 +163,7 @@ public partial class App : Application
                 Mark(dir, "page " + item.Key);
                 item.IsSelected = true;
                 Layout();
-                bool slow = item.Key is "problems" or "drivers" or "startup" or "windowed" or "optimize" or "hardware";
+                bool slow = item.Key is "problems" or "drivers" or "startup" or "windowed" or "optimize" or "hardware" or "nvidia";
                 await Task.Delay(slow ? 8000 : 3000);
                 Layout();
                 string name = $"{++n:00}-{item.Key}";

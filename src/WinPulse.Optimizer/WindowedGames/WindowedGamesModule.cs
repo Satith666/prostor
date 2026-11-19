@@ -69,7 +69,7 @@ public static class RevertPlanner
     public static List<Change> Plan(IEnumerable<BackupEntry> entries, Func<string, string?> itemTitle)
     {
         var result = new List<Change>();
-        var order = new Dictionary<string, int> { ["detach"] = 0, ["display"] = 1, ["registry"] = 2, ["task"] = 3, ["power"] = 4 };
+        var order = new Dictionary<string, int> { ["detach"] = 0, ["display"] = 1, ["registry"] = 2, ["task"] = 3, ["nvidia"] = 4, ["power"] = 5 };
         foreach (var e in entries.OrderBy(e => order.GetValueOrDefault(e.Kind, 9)))
         {
             string title = itemTitle(e.ItemId) ?? e.Title;
@@ -142,6 +142,22 @@ public static class RevertPlanner
                         Title = title,
                         Before = Lang.T("текущая частота", "current refresh rate"),
                         After = $"{e.Width}×{e.Height}, {e.Frequency} " + Lang.T("Гц", "Hz"),
+                        Why = why,
+                        RevertTargetId = e.TargetId,
+                    });
+                    break;
+                case "nvidia":
+                    result.Add(new Change
+                    {
+                        ItemId = e.ItemId,
+                        Kind = ChangeKind.NvidiaSetting,
+                        NvApp = e.NvApp,
+                        NvAppName = e.NvAppName,
+                        NvSettingId = e.NvSettingId,
+                        NvValue = e.Existed && uint.TryParse(e.Data, out uint v) ? v : null,
+                        Title = title,
+                        Before = Lang.T("текущее значение", "current value"),
+                        After = e.Existed ? (e.Data ?? "") : Lang.T("по умолчанию драйвера", "driver default"),
                         Why = why,
                         RevertTargetId = e.TargetId,
                     });
