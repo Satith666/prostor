@@ -89,3 +89,12 @@ CPU% процесса = Δ(User+Kernel) / (Δt · 1e7 · логических я
 - Выбор игры: путь к exe + «Обзор…» + список запущенных процессов с окнами; хранить в `settings.json`.
 - Локализация: класс `Loc` с индексатором и `PropertyChanged("Item[]")` при смене языка; в XAML — `{Binding [ключ], Source={x:Static l:Loc.I}}`; ключи без точек.
 - После изменений в UserGpuPreferences напоминать перезапустить игру.
+
+
+## Обновление (19.11.2026, вечер)
+- Дизайн «Кокпит» (вариант A из трёх макетов): Theme/Colors.xaml + Controls.xaml, шрифт заголовков Bahnschrift, RingGauge в Controls/Charts.cs.
+- Новые разделы меню: ИГРЫ — «FPS-лаборатория» (GamesViewModel/GamesView), «Железо и FPS» (Optimizer/Hardware/HardwareModule, диагностика без изменений), «Игры в окне»; СИСТЕМА — «Проблемы», «Оптимизация» (разделы «Для игр» и «Windows без лишнего»), «Автозагрузка», «Драйверы».
+- Core/Gaming: FrameStats, PresentMonCsv, GameDetector, GameSessionTracker, SessionAnalyzer. Collectors/Gaming/PresentMon.cs (поиск/скачивание/замер с чтением CSV на лету), Collectors/Hardware/HardwareReader.cs (WMI через PowerShell, PCIe через cfgmgr32, библиотеки Steam/Epic).
+- Optimizer/Gaming/GameBoost.cs — игровой режим (настройки в AppSettings.AutoBoost/Boost), включается по событию начала сессии.
+- CI: PresentMon кладётся рядом с exe; режим `WinPulse.exe --demo --lang ru --screenshots <папка>` снимает все страницы, снимки публикуются в ветку `winpulse-shots`; упавшие тесты выводятся аннотациями (`/repos/.../check-runs/<job>/annotations`).
+- План и статус этапов: docs/План_прокачки.md. Следующее: датчики (LibreHardwareMonitor), драйвер NVIDIA по играм (NvAPIWrapper, через elevated-помощника), апскейлинг (DLSS Swapper/OptiScaler — скачивание релизов, только одиночные игры).
