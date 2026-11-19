@@ -120,6 +120,8 @@ public sealed class OverviewViewModel : PageViewModel
     }
 
     public IReadOnlyList<KpiVm> Kpis { get; }
+    /// <summary>Страница игр — для переключателя игрового режима в шапке «Пульта».</summary>
+    public GamesViewModel? Games { get; set; }
     /// <summary>Четыре круговых датчика «Пульта».</summary>
     public IReadOnlyList<KpiVm> Rings { get; }
 

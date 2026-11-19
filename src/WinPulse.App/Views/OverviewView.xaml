@@ -64,8 +64,13 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="30,26,30,30">
 
-            <!-- Заголовок и статус -->
-            <TextBlock Text="Пульт" Style="{StaticResource H1}" FontSize="32"/>
+            <!-- Заголовок, статус и игровой режим -->
+            <Grid>
+                <TextBlock Text="Пульт" Style="{StaticResource H1}" FontSize="32"/>
+                <ToggleButton Style="{StaticResource GameModeToggle}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                              IsChecked="{Binding Games.BoostEnabled, Mode=TwoWay}" Content="{Binding Games.BoostLabel}"
+                              ToolTip="{Binding Games.BoostText}"/>
+            </Grid>
             <WrapPanel Margin="0,8,0,22">
                 <Border Style="{StaticResource StatusChip}" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">

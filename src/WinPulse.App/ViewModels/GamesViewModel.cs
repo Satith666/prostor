@@ -9,6 +9,7 @@ using WinPulse.Core;
 using WinPulse.Core.Analysis;
 using WinPulse.Core.Formatting;
 using WinPulse.Core.Gaming;
+using WinPulse.Optimizer.Gaming;
 
 namespace WinPulse.App.ViewModels;
 
@@ -229,9 +230,12 @@ public sealed class GamesViewModel : PageViewModel
     private bool _sessionActive;
     private SessionItemVm? _selectedSession;
     private DateTime _liveFpsAt;
+    private readonly AppSettings _settings;
+    private string _boostText = "";
 
-    public GamesViewModel()
+    public GamesViewModel(AppSettings settings)
     {
+        _settings = settings;
         _measurements = GameStore.LoadMeasurements();
         RebuildHistory();
         foreach (var r in GameStore.LoadSessions()) Sessions.Add(new SessionItemVm(SessionAnalyzer.Analyze(r)));
@@ -246,9 +250,62 @@ public sealed class GamesViewModel : PageViewModel
             if (p is string s && int.TryParse(s, out int v)) Duration = v;
         });
         RefreshTool();
+        OnBoost(null);
     }
 
     public override string Key => "lab";
+
+    // ---------- Игровой режим ----------
+
+    /// <summary>Пользователь включил или выключил игровой режим (true — включён).</summary>
+    public event Action<bool>? BoostToggled;
+
+    public bool BoostEnabled
+    {
+        get => _settings.AutoBoost;
+        set
+        {
+            if (_settings.AutoBoost == value) return;
+            _settings.AutoBoost = value;
+            _settings.Save();
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(BoostLabel));
+            OnBoost(null);
+            BoostToggled?.Invoke(value);
+        }
+    }
+
+    public string BoostLabel => _settings.AutoBoost ? Lang.T("Игровой режим: ВКЛ", "Game mode: ON") : Lang.T("Игровой режим: ВЫКЛ", "Game mode: OFF");
+    public bool BoostPower { get => _settings.Boost.PowerPlan; set { _settings.Boost.PowerPlan = value; SaveBoost(); } }
+    public bool BoostWallpaper { get => _settings.Boost.PauseWallpaper; set { _settings.Boost.PauseWallpaper = value; SaveBoost(); } }
+    public bool BoostGamePriority { get => _settings.Boost.GamePriority; set { _settings.Boost.GamePriority = value; SaveBoost(); } }
+    public bool BoostBackground { get => _settings.Boost.BackgroundPriority; set { _settings.Boost.BackgroundPriority = value; SaveBoost(); } }
+    public string BoostText { get => _boostText; private set => Set(ref _boostText, value); }
+
+    private void SaveBoost()
+    {
+        _settings.Save();
+        OnPropertyChanged(nameof(BoostPower));
+        OnPropertyChanged(nameof(BoostWallpaper));
+        OnPropertyChanged(nameof(BoostGamePriority));
+        OnPropertyChanged(nameof(BoostBackground));
+    }
+
+    /// <summary>Состояние игрового режима: null — сейчас не действует. Вызывается в потоке интерфейса.</summary>
+    public void OnBoost(BoostState? state)
+    {
+        if (state is not null)
+        {
+            BoostText = Lang.T($"Действует для «{state.Game}»: ", $"Active for “{state.Game}”: ") +
+                        (state.Done.Count == 0 ? Lang.T("менять ничего не понадобилось.", "nothing needed changing.") : string.Join("; ", state.Done) + ".") +
+                        (state.Skipped.Count == 0 ? "" : " " + string.Join(" ", state.Skipped));
+            return;
+        }
+        BoostText = _settings.AutoBoost
+            ? Lang.T("Включится сам, когда вы запустите игру, и всё вернёт после неё.", "Turns on by itself when you start a game and restores everything afterwards.")
+            : Lang.T("Выключен. Включите — и на время игры WinPulse поднимет схему питания, поставит обои на паузу и уберёт фоновые программы с дороги. После игры всё вернётся.",
+                "Off. Turn it on and while you play WinPulse raises the power plan, pauses wallpapers and moves background apps out of the way. Everything is restored afterwards.");
+    }
 
     public ObservableCollection<GameTargetVm> Targets { get; } = new();
     public ObservableCollection<MeasurementVm> History { get; } = new();

@@ -61,6 +61,9 @@ public sealed class AppSettings
     public bool ProMode { get; set; }
     public string? GameExe { get; set; }
     public HashSet<string> Marks { get; set; } = new();
+    /// <summary>Игровой режим: включать самому, когда WinPulse замечает игру.</summary>
+    public bool AutoBoost { get; set; }
+    public WinPulse.Optimizer.Gaming.BoostOptions Boost { get; set; } = new();
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 

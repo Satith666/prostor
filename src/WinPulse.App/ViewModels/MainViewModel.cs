@@ -73,6 +73,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private bool _disposed;
     private MonitorFrame? _last;
     private readonly GameSessionTracker _tracker = new();
+    private readonly object _boostLock = new();
+    private WinPulse.Optimizer.Gaming.BoostState? _boost;
     private int _sessionTicks;
     private NavItem? _selected;
     private PageViewModel? _page;
@@ -108,7 +110,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             var problems = Nav.FirstOrDefault(n => n.Key == "problems");
             if (problems is not null) problems.Alert = count > 0 ? count.ToString() : null;
         };
-        Games = new GamesViewModel();
+        Games = new GamesViewModel(settings);
+        Overview.Games = Games;
+        Games.BoostToggled += enabled => Task.Run(() =>
+        {
+            if (!enabled) StopBoost();
+            else if (_tracker.Current is { } current) StartBoost(current);
+        });
         if (IsDemo && !Games.HasSessions) Games.AddSession(WinPulse.Core.Demo.DemoSession.Create());
         Add("lab", "nav.lab", "Icon.Lab", Games, "nav.games");
         Add("hardware", "nav.hardware", "Icon.Chip", new FixModuleViewModel("hardware", new WinPulse.Optimizer.Hardware.HardwareModule(),
@@ -122,9 +130,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         // Игровые сессии пишутся в фоне, на каждом кадре мониторинга (даже если окно свёрнуто).
         _tracker.IsPinned = path => path is not null && _settings.GameExe is string pinned &&
                                     string.Equals(path, pinned, StringComparison.OrdinalIgnoreCase);
-        _tracker.Started += record => _dispatcher.InvokeAsync(() => Games.OnSessionState(record));
+        _tracker.Started += record =>
+        {
+            _dispatcher.InvokeAsync(() => Games.OnSessionState(record));
+            if (_settings.AutoBoost) StartBoost(record);
+        };
         _tracker.Finished += record =>
         {
+            StopBoost();
             GameStore.SaveSession(record);
             _dispatcher.InvokeAsync(() =>
             {
@@ -350,6 +363,48 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void StartBoost(GameSessionRecord record)
+    {
+        WinPulse.Optimizer.Gaming.BoostState state;
+        lock (_boostLock)
+        {
+            if (_boost is not null || IsDemo) return;
+            try
+            {
+                state = WinPulse.Optimizer.Gaming.GameBoost.Apply(record.Game, record.ExePath, _settings.Boost);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("boost-apply", ex);
+                return;
+            }
+            _boost = state;
+        }
+        Log.Info("Игровой режим для " + record.Game + ": " + string.Join("; ", state.Done));
+        _dispatcher.InvokeAsync(() => Games.OnBoost(state));
+    }
+
+    private void StopBoost()
+    {
+        WinPulse.Optimizer.Gaming.BoostState? state;
+        lock (_boostLock)
+        {
+            state = _boost;
+            _boost = null;
+        }
+        if (state is null) return;
+        try
+        {
+            var problems = WinPulse.Optimizer.Gaming.GameBoost.Restore(state);
+            if (problems.Count > 0) Log.Info("Игровой режим: вернуть не удалось — " + string.Join("; ", problems));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("boost-restore", ex);
+        }
+        _dispatcher.InvokeAsync(() => Games.OnBoost(null));
+    }
+
     public void Dispose()
     {
         _cts.Cancel();
@@ -360,6 +415,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             try
             {
                 _tracker.Flush(DateTime.Now); // сохранить незаконченную сессию при выходе
+                StopBoost();
             }
             catch (Exception ex)
             {

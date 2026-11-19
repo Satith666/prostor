@@ -314,6 +314,48 @@
         </Setter>
     </Style>
 
+    <!-- Большая кнопка «Игровой режим» (шапка «Пульта»): включено — градиент и подсветка -->
+    <Style x:Key="GameModeToggle" TargetType="ToggleButton">
+        <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid>
+                        <Border x:Name="glow" CornerRadius="14" Background="{StaticResource AccentGradientSoft}" Opacity="0"
+                                Effect="{StaticResource GlowCyan}"/>
+                        <Border x:Name="bd" CornerRadius="14" Padding="18,11" BorderThickness="1"
+                                Background="#0DFFFFFF" BorderBrush="{StaticResource LineBright}">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="20" Height="20" Margin="0,0,10,0">
+                                    <Canvas Width="24" Height="24">
+                                        <Path x:Name="icon" Data="{StaticResource Icon.Game}" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.8"
+                                              StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                    </Canvas>
+                                </Viewbox>
+                                <ContentPresenter VerticalAlignment="Center" TextElement.FontFamily="{StaticResource DisplayFont}"
+                                                  TextElement.FontSize="15" TextElement.FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="BorderBrush" Value="#8022D3EE"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="glow" Property="Opacity" Value="1"/>
+                            <Setter TargetName="bd" Property="Background" Value="Transparent"/>
+                            <Setter TargetName="bd" Property="BorderBrush" Value="#9922D3EE"/>
+                            <Setter TargetName="icon" Property="Stroke" Value="#67E8F9"/>
+                            <Setter Property="Foreground" Value="#F2FBFF"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Стрелка раскрытия -->
     <Style x:Key="Chevron" TargetType="ToggleButton">
         <Setter Property="Cursor" Value="Hand"/>
