@@ -55,7 +55,7 @@ public sealed class LatencyAggregator
 
     private readonly List<(ulong Base, ulong End, string Name)> _modules = [];
     private bool _sorted;
-    private readonly Dictionary<string, DriverLatency> _drivers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<ulong, DriverLatency> _routines = new();
     private readonly long[] _histogram = new long[Buckets.Length + 1];
     private long _dpc, _isr;
     private double _maxDpc, _maxIsr, _total;
@@ -113,11 +113,14 @@ public sealed class LatencyAggregator
 
     public static string Unknown => Lang.T("неизвестный модуль", "unknown module");
 
+    /// <summary>
+    /// Событие DPC/ISR. Модуль по адресу определяется только в <see cref="Build"/>: список драйверов может прийти
+    /// уже после событий (например, из psapi после замера).
+    /// </summary>
     public void Add(bool isr, ulong routine, double us)
     {
         if (!(us >= 0) || us > 1_000_000) return; // мусор и переполнения отбрасываем
-        string name = ModuleOf(routine);
-        if (!_drivers.TryGetValue(name, out var d)) _drivers[name] = d = new DriverLatency { Name = name };
+        if (!_routines.TryGetValue(routine, out var d)) _routines[routine] = d = new DriverLatency();
         if (isr)
         {
             _isr++;
@@ -141,20 +144,36 @@ public sealed class LatencyAggregator
         _histogram[bucket]++;
     }
 
-    public LatencyReport Build(double seconds, long eventsLost, string moduleSource) => new()
+    public LatencyReport Build(double seconds, long eventsLost, string moduleSource)
     {
-        Seconds = seconds,
-        DpcCount = _dpc,
-        IsrCount = _isr,
-        MaxDpcUs = _maxDpc,
-        MaxIsrUs = _maxIsr,
-        TotalUs = _total,
-        EventsLost = eventsLost,
-        ModulesKnown = _modules.Count,
-        ModuleSource = moduleSource,
-        Histogram = (long[])_histogram.Clone(),
-        Drivers = _drivers.Values.OrderByDescending(d => d.MaxUs).ThenByDescending(d => d.TotalUs).ToList(),
-    };
+        var drivers = new Dictionary<string, DriverLatency>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (routine, r) in _routines)
+        {
+            string name = ModuleOf(routine);
+            if (!drivers.TryGetValue(name, out var d)) drivers[name] = d = new DriverLatency { Name = name };
+            d.DpcCount += r.DpcCount;
+            d.IsrCount += r.IsrCount;
+            d.MaxDpcUs = Math.Max(d.MaxDpcUs, r.MaxDpcUs);
+            d.MaxIsrUs = Math.Max(d.MaxIsrUs, r.MaxIsrUs);
+            d.TotalUs += r.TotalUs;
+            d.Over500 += r.Over500;
+            d.Over1000 += r.Over1000;
+        }
+        return new LatencyReport
+        {
+            Seconds = seconds,
+            DpcCount = _dpc,
+            IsrCount = _isr,
+            MaxDpcUs = _maxDpc,
+            MaxIsrUs = _maxIsr,
+            TotalUs = _total,
+            EventsLost = eventsLost,
+            ModulesKnown = _modules.Count,
+            ModuleSource = moduleSource,
+            Histogram = (long[])_histogram.Clone(),
+            Drivers = drivers.Values.OrderByDescending(d => d.MaxUs).ThenByDescending(d => d.TotalUs).ToList(),
+        };
+    }
 
     public static string FileNameOf(string path)
     {

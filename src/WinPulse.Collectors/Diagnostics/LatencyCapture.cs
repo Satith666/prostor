@@ -165,12 +165,20 @@ public static unsafe class LatencyCapture
         }
 
         string source = "etw";
-        if (dcStart == 0)
+        if (dcStart < 10)
         {
-            // Список модулей ядра не пришёл из ETW — берём адреса драйверов у psapi.
+            // Список модулей ядра не пришёл из ETW (рандаун системной сессии его не присылает) —
+            // берём адреса и размеры у ядра напрямую, а если не вышло — у psapi (без размеров).
             EnableDebugPrivilege();
-            AddDriversFromPsapi(agg);
-            source = "psapi";
+            if (AddDriversFromKernel(agg))
+            {
+                source = "ntquery";
+            }
+            else
+            {
+                AddDriversFromPsapi(agg);
+                source = "psapi";
+            }
         }
         // Обработчик ещё мог успеть отработать после агрегирования — отчёт строим один раз в конце.
         var report = agg.Build(watch.Elapsed.TotalSeconds, lost, source);
@@ -240,6 +248,53 @@ public static unsafe class LatencyCapture
         {
             Diag.Report("debug privilege", ex);
         }
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQuerySystemInformation(int infoClass, IntPtr buffer, int length, out int returnLength);
+
+    /// <summary>SystemModuleInformation (11): RTL_PROCESS_MODULES — база, размер и путь каждого модуля ядра.</summary>
+    private static bool AddDriversFromKernel(LatencyAggregator agg)
+    {
+        const int SystemModuleInformation = 11, EntrySize = 296, NameOffset = 40, StatusInfoLengthMismatch = unchecked((int)0xC0000004);
+        int length = 256 * 1024;
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            IntPtr buffer = Marshal.AllocHGlobal(length);
+            try
+            {
+                int status = NtQuerySystemInformation(SystemModuleInformation, buffer, length, out int needed);
+                if (status == StatusInfoLengthMismatch)
+                {
+                    length = Math.Max(length * 2, needed + 4096);
+                    continue;
+                }
+                if (status != 0) return false;
+                int count = Marshal.ReadInt32(buffer);
+                int added = 0;
+                for (int i = 0; i < count && 8 + (i + 1) * EntrySize <= length; i++)
+                {
+                    byte* entry = (byte*)buffer + 8 + i * EntrySize;
+                    ulong imageBase = *(ulong*)(entry + 16);
+                    uint size = *(uint*)(entry + 24);
+                    string path = Marshal.PtrToStringAnsi((IntPtr)(entry + NameOffset)) ?? "";
+                    if (imageBase < KernelSpace) continue; // без привилегии адреса скрыты (нули)
+                    agg.AddModule(imageBase, size, path);
+                    added++;
+                }
+                return added > 0;
+            }
+            catch (Exception ex)
+            {
+                Diag.Report("kernel modules", ex);
+                return false;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+        return false;
     }
 
     private static void AddDriversFromPsapi(LatencyAggregator agg)
