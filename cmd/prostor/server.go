@@ -543,6 +543,26 @@ func routes() http.Handler {
 	})
 
 	// ------------------------------------------------------------ duplicates & advisor
+	post("/api/dupes/photos", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Path string }
+		readJSON(r, &req)
+		_, err := startJob("photos", func(j *Job) (any, error) { return findSimilarPhotos(j, filepath.Clean(req.Path)) })
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
+	get("/api/fs/thumb", func(w http.ResponseWriter, r *http.Request) {
+		b, err := photoThumb(r.URL.Query().Get("path"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("Cache-Control", "private, max-age=600")
+		w.Write(b)
+	})
 	post("/api/dupes/start", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Path  string

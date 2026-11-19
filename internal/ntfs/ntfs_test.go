@@ -255,13 +255,13 @@ func sample() []fileSpec {
 func check(t *testing.T, recs []Rec) {
 	t.Helper()
 	get := func(n int) Rec { return recs[n] }
-	if r := get(3); r.Name != "split.dat" || r.Size != 7 {
+	if r := get(3); r.Name != "split.dat" || r.Size != 7 || r.Alloc != 8 {
 		t.Errorf("record across extents: %+v", r)
 	}
 	if r := get(16); !r.Dir || r.Name != "Users" || r.Parent != RecRoot || r.MTime != 1700000000 {
 		t.Errorf("Users: %+v", r)
 	}
-	if r := get(17); r.Name != "a.txt" || r.Parent != 16 || r.Size != 100 || r.Alloc != 0 || r.MTime != 1700000100 {
+	if r := get(17); r.Name != "a.txt" || r.Parent != 16 || r.Size != 100 || r.Alloc != 104 || r.MTime != 1700000100 {
 		t.Errorf("resident file: %+v", r)
 	}
 	if r := get(18); r.Size != 10000 || r.Alloc != 12288 || r.Attr != 0x20 {
@@ -291,7 +291,7 @@ func check(t *testing.T, recs []Rec) {
 	if r := get(26); r.Link || r.Size != 900000 || r.Alloc != 0 {
 		t.Errorf("cloud placeholder: %+v", r)
 	}
-	if r := get(27); r.Link || r.Size != 300000 || r.Alloc != 98304 {
+	if r := get(27); r.Link || !r.WOF || r.Size != 300000 || r.Alloc != 98304 {
 		t.Errorf("file compressed by Windows (WOF): %+v", r)
 	}
 }

@@ -1450,7 +1450,103 @@ function dupesBar(d) {
     <button class="btn primary lg" data-act="delete" ${n ? '' : 'disabled'}>${ic('trash')}Удалить выбранные</button>`;
 }
 
+// Два режима раздела: одинаковые файлы и похожие фото.
+const duModeHTML = () => `<div class="seg" style="margin-bottom:22px">${[['files', 'Одинаковые файлы'], ['photos', 'Похожие фото']].map(([v, n]) => `<button class="${(S.duMode || 'files') === v ? 'on' : ''}" data-act="duMode" data-v="${v}">${n}</button>`).join('')}</div>`;
+
+async function startPhotos(path) {
+  if (!path) return;
+  S.ph = { root: path, running: true, sel: new Set(), shown: 40 };
+  if (location.hash !== '#dupes') go('dupes'); else render(false);
+  let s;
+  try {
+    s = await startJob('photos', '/api/dupes/photos', { path });
+  } catch (e) {
+    S.ph.running = false; S.ph.error = e.message; rerender('dupes'); return;
+  }
+  S.ph.running = false;
+  if (s.err) { S.ph.error = s.err; rerender('dupes'); return; }
+  S.ph.result = s.result;
+  // в каждой группе отмечено всё, кроме лучшего снимка
+  for (const g of s.result.groups || []) for (const f of g.files) if (!f.best) S.ph.sel.add(f.path);
+  rerender('dupes');
+}
+function photosBar(p) {
+  let size = 0, n = 0;
+  for (const g of p.result.groups) for (const f of g.files) if (p.sel.has(f.path)) { n++; size += f.size; }
+  return `<div class="sum"><b>${fmtSize(size)}</b><span>выбрано ${nFiles(n)}, они уйдут в ${qWhere()}</span></div><span class="grow"></span>
+    <button class="btn primary lg" data-act="phDelete" ${n ? '' : 'disabled'}>${ic('trash')}Удалить выбранные</button>`;
+}
+const thumbURL = (path) => '/api/fs/thumb?path=' + encodeURIComponent(path) + '&t=' + encodeURIComponent(TOKEN);
+function photosPage(m) {
+  const p = S.ph;
+  let body = '';
+  if (!p) {
+    body = `<div class="empty">${ic('image')}<h3>Похожие фотографии</h3><p>Выберите папку с фото выше. Найдутся серии почти одинаковых кадров, уменьшенные и пересохранённые копии. В каждой группе останется снимок с самым большим разрешением.</p></div>`;
+  } else if (p.running) {
+    body = `<div class="scanning"><div class="prog"><i id="duBar" style="width:2%"></i></div>
+      <div class="counters"><div><b id="duFiles">0</b><span id="duWhat">фото просмотрено</span></div><div><b id="duBytes">0</b><span>похожих копий найдено</span></div></div>
+      <div class="row-flex"><button class="btn" data-act="stop">${ic('stop')}Остановить</button><span class="faint small" id="duPhase"></span></div><div class="curpath" id="duCur"></div></div>`;
+  } else if (p.error) {
+    body = `<div class="empty">${ic('warn')}<h3>Поиск не удался</h3><p>${esc(p.error)}</p></div>`;
+  } else if (p.result) {
+    const groups = p.result.groups || [];
+    if (!groups.length) {
+      body = `<div class="empty">${ic('check')}<h3>Похожих фото нет</h3><p>Проверено ${fmtNum(p.result.scanned)} ${plural(p.result.scanned, 'изображение', 'изображения', 'изображений')}.</p></div>`;
+    } else {
+      body = `<div class="an-sum"><b>${fmtSize(p.result.wasted)}</b><span class="muted">занимают похожие копии: ${fmtNum(groups.length)} ${plural(groups.length, 'группа', 'группы', 'групп')}, проверено ${fmtNum(p.result.scanned)} изображений</span></div>
+        ${note('info', 'В каждой группе отмечены все снимки, кроме лучшего (самое большое разрешение). Просмотрите группы: в серии могут оказаться разные кадры, которые вам нужны.')}
+        <div class="list">${groups.slice(0, p.shown).map((g, gi) => `<div class="pgroup"><div class="gh"><b>${fmtNum(g.files.length)} ${plural(g.files.length, 'снимок', 'снимка', 'снимков')}</b><span class="faint">лишнее ${fmtSize(g.wasted)}</span></div>
+          <div class="pgrid">${g.files.map((f) => `<label class="pcard ${p.sel.has(f.path) ? 'del' : ''}" title="${esc(f.path)}">
+            <img loading="lazy" src="${thumbURL(f.path)}" alt="">
+            <span class="pc-top"><input type="checkbox" class="ck" data-act="phSel" data-path="${esc(f.path)}" ${p.sel.has(f.path) ? 'checked' : ''} aria-label="Удалить ${esc(f.path.split(/[\\/]/).pop())}">${f.best ? '<em>лучший</em>' : ''}</span>
+            <span class="pc-meta"><b>${esc(f.path.split(/[\\/]/).pop())}</b><small>${f.w}×${f.h}, ${fmtSize(f.size)}, ${fmtDate(f.mtime)}</small></span></label>`).join('')}</div></div>`).join('')}</div>
+        ${groups.length > p.shown ? `<div class="more"><button class="btn" data-act="phMore">Показать ещё</button></div>` : ''}
+        <div class="actionbar" id="phBar">${photosBar(p)}</div>`;
+    }
+  }
+  m.innerHTML = `<div class="page">${head('Дубликаты', `Одинаковые файлы и похожие фото, которые зря занимают место. Удалённое попадает в ${qWhere()}, его можно вернуть.`)}
+    ${duModeHTML()}${pickerHTML(p && p.root, 'phStart')}${body}</div>`;
+  acts({
+    duMode: (el) => { S.duMode = el.dataset.v; render(false); },
+    phStart: (el) => startPhotos(el.dataset.path),
+    phStartPick: async () => { const x = await pickFolder('Где искать похожие фото?'); if (x) startPhotos(x); },
+    stop: () => cancelJob('photos'),
+    phSel: (el) => {
+      if (el.checked) p.sel.add(el.dataset.path); else p.sel.delete(el.dataset.path);
+      el.closest('.pcard').classList.toggle('del', el.checked);
+      $('#phBar').innerHTML = photosBar(p);
+    },
+    phMore: () => { p.shown += 40; render(false); },
+    phDelete: async () => {
+      const groups = p.result.groups;
+      if (groups.some((g) => g.files.every((f) => p.sel.has(f.path)))) {
+        info('Выбраны все снимки группы', '<p>В какой-то группе отмечены все снимки. Оставьте хотя бы один.</p>');
+        return;
+      }
+      const paths = [];
+      let total = 0;
+      for (const g of groups) for (const f of g.files) if (p.sel.has(f.path)) { paths.push(f.path); total += f.size; }
+      const done = await removePaths(paths, total, 'Похожие фото');
+      if (!done || !done.length) return;
+      const gone = new Set(done.map((x) => x.toLowerCase()));
+      for (const g of groups) g.files = g.files.filter((f) => !gone.has(f.path.toLowerCase()));
+      p.result.groups = groups.filter((g) => g.files.length > 1).map((g) => Object.assign(g, { wasted: sum(g.files.filter((f) => !f.best), (f) => f.size) }));
+      p.result.wasted = sum(p.result.groups, (g) => g.wasted);
+      for (const x of done) p.sel.delete(x);
+      render(false);
+    },
+  });
+  pageHooks.photos = (s) => {
+    const b = $('#duBar'); if (b) b.style.width = s.total ? Math.max(2, pct(s.done, s.total)) + '%' : '2%';
+    const f = $('#duFiles'); if (f) f.textContent = fmtNum(s.total ? s.done : s.files);
+    const w = $('#duWhat'); if (w) w.textContent = s.total ? `из ${fmtNum(s.total)} сравнено` : 'фото найдено';
+    const p2 = $('#duPhase'); if (p2) p2.textContent = s.phase || '';
+  };
+  if (!p || !p.running) ready(m);
+}
+
 PAGES.dupes = (m) => {
+  if (S.duMode === 'photos') { if (!S.folders) loadFolders().then(() => rerender('dupes')); photosPage(m); return; }
   if (!S.folders) loadFolders().then(() => rerender('dupes'));
   const d = S.du;
   const minMB = (d && d.minMB) || S.duMin || (S.settings && S.settings.minDupMB) || 1;
@@ -1483,11 +1579,12 @@ PAGES.dupes = (m) => {
         <div class="actionbar" id="duBar2">${dupesBar(d)}</div>`;
     }
   }
-  m.innerHTML = `<div class="page">${head('Дубликаты', `Одинаковые файлы, которые зря занимают место. Удалённое попадает в ${qWhere()}, его можно вернуть.`)}
-    ${pickerHTML(d && d.root, 'start')}
+  m.innerHTML = `<div class="page">${head('Дубликаты', `Одинаковые файлы и похожие фото, которые зря занимают место. Удалённое попадает в ${qWhere()}, его можно вернуть.`)}
+    ${duModeHTML()}${pickerHTML(d && d.root, 'start')}
     <div class="row-flex" style="margin:-14px 0 30px"><span class="small muted">Файлы не меньше</span>
       <div class="seg">${sizes.map(([v, n]) => `<button class="${minMB === v ? 'on' : ''}" data-act="min" data-v="${v}">${n}</button>`).join('')}</div></div>${body}</div>`;
   acts({
+    duMode: (el) => { S.duMode = el.dataset.v; render(false); },
     start: (el) => startDupes(el.dataset.path, minMB),
     startPick: async () => { const p = await pickFolder('Где искать дубликаты?'); if (p) startDupes(p, minMB); },
     stop: () => cancelJob('dupes'),

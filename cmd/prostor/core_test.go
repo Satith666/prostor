@@ -5,7 +5,13 @@ package main
 // в изолированной временной папке, плюс отдельные пограничные случаи.
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -532,5 +538,97 @@ func TestSnapshotGrowth(t *testing.T) {
 	}
 	if len(g.Shrank) != 1 || g.Shrank[0].Name != "Old" || !g.Shrank[0].Gone {
 		t.Fatalf("shrank: %+v", g.Shrank)
+	}
+}
+
+// Similar photos: a picture, its smaller copy and a slightly brighter copy
+// form one group with the biggest one kept; an unrelated picture stays out.
+func TestSimilarPhotos(t *testing.T) {
+	dir := t.TempDir()
+	saved := photoMinSize
+	photoMinSize = 1 << 10 // the synthetic pictures compress very well
+	t.Cleanup(func() { photoMinSize = saved })
+	scene := func(w, h int, bright int, seed int) image.Image {
+		img := image.NewRGBA(image.Rect(0, 0, w, h))
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				// a few big shapes on a gradient: the brightness pattern dHash looks at
+				v := 40 + x*120/w + y*40/h
+				if (x/(w/5)+y/(h/4)+seed)%3 == 0 {
+					v += 60
+				}
+				c := min(255, v+bright)
+				img.Set(x, y, color.RGBA{uint8(c), uint8(c * 9 / 10), uint8(c * 7 / 10), 255})
+			}
+		}
+		return img
+	}
+	save := func(name string, img image.Image) {
+		f, err := os.Create(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		if strings.HasSuffix(name, ".png") {
+			png.Encode(f, img)
+		} else {
+			jpeg.Encode(f, img, &jpeg.Options{Quality: 92})
+		}
+	}
+	save("IMG_0001.jpg", scene(1200, 900, 0, 1))
+	save("IMG_0001 (копия).jpg", scaleDown(scene(1200, 900, 0, 1), 600))
+	save("IMG_0001 edited.png", scene(1200, 900, 6, 1))
+	save("other.jpg", scene(1200, 900, 0, 2))
+	res, err := findSimilarPhotos(newTestJob(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Scanned != 4 || len(res.Groups) != 1 || len(res.Groups[0].Files) != 3 {
+		t.Fatalf("groups: %+v", res.Groups)
+	}
+	g := res.Groups[0]
+	if !g.Files[0].Best || g.Files[0].W != 1200 || g.Files[1].Best || g.Wasted != g.Files[1].Size+g.Files[2].Size {
+		t.Fatalf("best copy: %+v", g)
+	}
+	for _, f := range g.Files {
+		if strings.Contains(f.Path, "other") {
+			t.Fatal("an unrelated picture was grouped")
+		}
+	}
+	if b, err := photoThumb(g.Files[0].Path); err != nil || len(b) < 100 {
+		t.Fatalf("preview: %v", err)
+	}
+	if _, err := photoThumb(filepath.Join(dir, "other.jpg")); err == nil {
+		t.Fatal("preview of a file outside the results")
+	}
+}
+
+// The EXIF preview inside a camera JPEG is found and used.
+func TestExifThumb(t *testing.T) {
+	var thumb bytes.Buffer
+	jpeg.Encode(&thumb, image.NewRGBA(image.Rect(0, 0, 16, 12)), nil)
+	// TIFF: header, IFD0 with no entries, IFD1 with the thumbnail's offset and length
+	tiff := []byte("II*\x00\x08\x00\x00\x00")
+	tiff = append(tiff, 0, 0, 14, 0, 0, 0) // IFD0: 0 entries, next IFD at 14
+	ifd1 := []byte{2, 0}
+	off := 14 + 2 + 2*12 + 4
+	e := func(tag uint16, v uint32) []byte {
+		b := make([]byte, 12)
+		binary.LittleEndian.PutUint16(b, tag)
+		binary.LittleEndian.PutUint16(b[2:], 4)
+		binary.LittleEndian.PutUint32(b[4:], 1)
+		binary.LittleEndian.PutUint32(b[8:], v)
+		return b
+	}
+	ifd1 = append(ifd1, e(0x0201, uint32(off))...)
+	ifd1 = append(ifd1, e(0x0202, uint32(thumb.Len()))...)
+	ifd1 = append(ifd1, 0, 0, 0, 0)
+	tiff = append(append(tiff, ifd1...), thumb.Bytes()...)
+	app1 := append([]byte("Exif\x00\x00"), tiff...)
+	file := []byte{0xFF, 0xD8, 0xFF, 0xE1, byte((len(app1) + 2) >> 8), byte(len(app1) + 2)}
+	file = append(append(file, app1...), 0xFF, 0xDA, 0, 2)
+	got := exifThumb(file)
+	if !bytes.Equal(got, thumb.Bytes()) {
+		t.Fatalf("thumbnail not found (%d bytes)", len(got))
 	}
 }

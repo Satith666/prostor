@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ func (t *selfTest) mftTestTree() (dir string, linked string, err error) {
 func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 	g := "Анализ диска"
 	a := t.sysAn
+	defer t.wofChecks(mft)
 	t.check(g, "Чтение MFT: скорость", func() (string, string) {
 		switch {
 		case !winapi.IsWindows:
@@ -129,6 +131,32 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 		}
 		df := pctDiff(mFiles, w.root.files)
 		ds := pctDiff(mSize, w.root.size)
+		if df > 1 || ds > 1 {
+			// where the difference is: the subfolders that differ most
+			a.treeMu.RLock()
+			type d struct {
+				name string
+				m, w int64
+			}
+			var diffs []d
+			wk := map[string]int64{}
+			for _, c := range w.root.children {
+				wk[lower(c.name)] = c.size
+			}
+			wk["(файлы в корне)"] = w.root.own
+			for _, c := range n.children {
+				diffs = append(diffs, d{c.name, c.size, wk[lower(c.name)]})
+			}
+			diffs = append(diffs, d{"(файлы в корне)", n.own, w.root.own})
+			a.treeMu.RUnlock()
+			sort.Slice(diffs, func(i, j int) bool { return abs64(diffs[i].m-diffs[i].w) > abs64(diffs[j].m-diffs[j].w) })
+			var parts []string
+			for _, x := range diffs[:min(6, len(diffs))] {
+				parts = append(parts, fmt.Sprintf("%s: MFT %s, обход %s", x.name, human(x.m), human(x.w)))
+			}
+			return failf("MFT: %d файлов, %s; обход: %d файлов, %s — расхождение %.2f%% по числу и %.2f%% по размеру. Больше всего отличаются: %s",
+				mFiles, human(mSize), w.root.files, human(w.root.size), df, ds, strings.Join(parts, "; "))
+		}
 		msg := fmt.Sprintf("MFT: %d файлов, %s; обход: %d файлов, %s (без доступа папок: %d) — расхождение %.2f%% по числу и %.2f%% по размеру",
 			mFiles, human(mSize), w.root.files, human(w.root.size), w.denied.Load(), df, ds)
 		if df > 1 || ds > 1 {
@@ -187,4 +215,68 @@ func mftFileDiffs(dir string) string {
 	}
 	walk(dir)
 	return strings.Join(out, "; ")
+}
+
+func abs64(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// wofChecks looks at files Windows itself compressed (CompactOS): how big
+// they are by the folder listing, by the MFT record, by the open file and by
+// GetCompressedFileSize (what Explorer shows as size on disk).
+func (t *selfTest) wofChecks(mft bool) {
+	t.check("Анализ диска", "Чтение MFT: файлы, сжатые Windows", func() (string, string) {
+		if !winapi.IsWindows || !mft {
+			return skipf("нужны Windows, права администратора и NTFS")
+		}
+		dir := filepath.Join(os.Getenv("SystemRoot"), "System32")
+		r, closeVol, err := winapi.OpenVolume(filepath.VolumeName(dir) + `\`)
+		if err != nil {
+			return failf("%v", err)
+		}
+		defer closeVol()
+		v, err := ntfs.Open(r)
+		if err != nil {
+			return failf("%v", err)
+		}
+		ents, err := winapi.ReadDir(dir)
+		if err != nil {
+			return failf("%v", err)
+		}
+		var n, wof int
+		var lst, rec, hnd, cmp [2]int64 // [all, WOF]
+		var sample []string
+		for _, e := range ents {
+			if e.IsDir || e.Link || e.ID == 0 {
+				continue
+			}
+			rr, err := v.Record(e.ID & 0xFFFFFFFFFFFF)
+			if err != nil {
+				continue
+			}
+			ha, ca, err := winapi.FileAlloc(filepath.Join(dir, e.Name))
+			if err != nil {
+				continue
+			}
+			n++
+			k := 0
+			if rr.WOF {
+				k = 1
+				wof++
+				if len(sample) < 4 {
+					sample = append(sample, fmt.Sprintf("%s: список %d, MFT %d, файл %d, сжатый %d, размер %d", e.Name, e.Alloc, rr.Alloc, ha, ca, e.Size))
+				}
+			}
+			lst[k] += e.Alloc
+			rec[k] += rr.Alloc
+			hnd[k] += ha
+			cmp[k] += ca
+		}
+		return okf("System32: %d файлов, сжатых Windows %d. Все файлы — список папки %s, MFT %s, сам файл %s, сжатый размер %s. Сжатые — список %s, MFT %s, файл %s, сжатый %s. Примеры: %s",
+			n, wof, human(lst[0]+lst[1]), human(rec[0]+rec[1]), human(hnd[0]+hnd[1]), human(cmp[0]+cmp[1]),
+			human(lst[1]), human(rec[1]), human(hnd[1]), human(cmp[1]), strings.Join(sample, "; "))
+	})
 }

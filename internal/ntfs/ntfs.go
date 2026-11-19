@@ -40,6 +40,7 @@ type Rec struct {
 	Links  uint16 // hard links (long names)
 	Dir    bool
 	Link   bool // junction, symlink or mount point (name surrogate reparse point)
+	WOF    bool // compressed by Windows (CompactOS, compact /exe)
 }
 
 // Volume is an opened NTFS volume.
@@ -442,7 +443,8 @@ func parseRecord(rec []byte, r *Rec) (ext *extPart, inUse bool) {
 				break
 			}
 			if !a.nonRes {
-				p.hasData, p.size, p.alloc = true, int64(len(a.value)), 0
+				// data kept inside the record: Windows reports it rounded up to 8 bytes
+				p.hasData, p.size, p.alloc = true, int64(len(a.value)), int64(len(a.value)+7)&^7
 			} else if a.startVCN == 0 {
 				p.hasData, p.size, p.alloc = true, a.size, a.total
 			}
@@ -465,8 +467,11 @@ func parseRecord(rec []byte, r *Rec) (ext *extPart, inUse bool) {
 	}
 	if p.hasReparseTag {
 		r.Link = p.reparseTag&0x20000000 != 0
-		if p.reparseTag == tagWOF && p.wofAlloc > 0 {
-			r.Alloc = p.wofAlloc // the real data lives in the compressed stream
+		if p.reparseTag == tagWOF {
+			r.WOF = true
+			if p.wofAlloc > 0 {
+				r.Alloc = p.wofAlloc // the real data lives in the compressed stream
+			}
 		}
 	}
 	if r.Dir {
