@@ -214,3 +214,9 @@ func CreateShortcut(lnk, target, args, workDir, icon, desc string) error {
 }
 
 func KillByName(string) int { return 0 }
+
+// FullNames: no 8.3 names outside Windows.
+func FullNames(p string) string { return p }
+
+// ShortPath: no 8.3 names outside Windows.
+func ShortPath(p string) string { return "" }

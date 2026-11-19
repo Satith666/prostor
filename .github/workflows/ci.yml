@@ -65,18 +65,25 @@ jobs:
           name: prostor-build
           path: dist
       - name: Тихая установка
+        id: install
         run: ./ci/windows.ps1 install
       - name: Окно WebView2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: ./ci/windows.ps1 webview2
       - name: Тест приманок в песочнице
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: ./ci/windows.ps1 bait
       - name: Тест приманок на живой системе
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: ./ci/windows.ps1 bait-live
       - name: Помощник с правами администратора
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: ./ci/windows.ps1 helper
       - name: Полная самопроверка
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: ./ci/windows.ps1 selftest ${{ matrix.os == 'windows-2025' && 'full' || 'quick' }}
       - name: Удаление программы
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: ./ci/windows.ps1 uninstall
       - uses: actions/upload-artifact@v4
         if: always()

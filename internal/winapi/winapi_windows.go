@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -919,3 +920,46 @@ func SetCmdLine(c *exec.Cmd, line string) {
 	}
 	c.SysProcAttr.CmdLine = line
 }
+
+var (
+	procGetLongPathNameW  = kernel32.NewProc("GetLongPathNameW")
+	procGetShortPathNameW = kernel32.NewProc("GetShortPathNameW")
+)
+
+func pathCall(proc *syscall.LazyProc, p string) string {
+	buf := make([]uint16, 300)
+	for {
+		n, _, _ := proc.Call(uintptr(unsafe.Pointer(u16(p))), uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+		if n == 0 {
+			return ""
+		}
+		if int(n) < len(buf) {
+			return syscall.UTF16ToString(buf[:n])
+		}
+		buf = make([]uint16, n+1)
+	}
+}
+
+// FullNames turns 8.3 short names (C:\Users\IVAN~1) into long ones, so paths
+// from the environment and from folder listings compare equal. Parts of the
+// path that do not exist (or wildcards) are kept as they are.
+func FullNames(p string) string {
+	if !strings.Contains(p, "~") {
+		return p
+	}
+	cur, rest := filepath.Clean(p), ""
+	for {
+		if l := pathCall(procGetLongPathNameW, cur); l != "" {
+			return filepath.Join(l, rest)
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return p
+		}
+		rest = filepath.Join(filepath.Base(cur), rest)
+		cur = parent
+	}
+}
+
+// ShortPath returns the 8.3 form of an existing path ("" if unavailable).
+func ShortPath(p string) string { return pathCall(procGetShortPathNameW, p) }

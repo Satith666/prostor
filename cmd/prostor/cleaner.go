@@ -69,10 +69,24 @@ func expandPath(p string) string {
 	if !winapi.IsWindows {
 		p = strings.ReplaceAll(p, `\`, "/")
 	}
-	return filepath.Clean(p)
+	return filepath.Clean(winapi.FullNames(p))
 }
 
 var forbiddenRoots []string
+
+// longEnv rewrites folder variables given in 8.3 form (C:\Users\IVAN~1, as
+// Windows does for some user names) to long names. Cleaning walks folders by
+// their long names, so exclusions, protected roots and the program's own
+// folders must use the same form to compare equal.
+func longEnv() {
+	for _, k := range []string{"TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "ProgramData", "PUBLIC", "SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"} {
+		if v := os.Getenv(k); v != "" {
+			if l := winapi.FullNames(v); l != v {
+				os.Setenv(k, l)
+			}
+		}
+	}
+}
 
 func initForbidden() {
 	env := []string{"SystemRoot", "SystemDrive", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData",
@@ -194,7 +208,7 @@ func newWalkOpts(t *Target, s Settings, cancel func() bool) *walkOpts {
 	for _, e := range s.Excludes {
 		e = strings.TrimSpace(e)
 		if e != "" {
-			o.excludes = append(o.excludes, lower(filepath.Clean(winapi.ExpandEnv(e))))
+			o.excludes = append(o.excludes, lower(filepath.Clean(winapi.FullNames(winapi.ExpandEnv(e)))))
 		}
 	}
 	return o

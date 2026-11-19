@@ -130,7 +130,7 @@ func quarantinePaths(paths []string, source string, days int, jr *journal) QResu
 	groups := map[string][]string{}
 	var order []string
 	for _, p := range paths {
-		p = filepath.Clean(p)
+		p = filepath.Clean(winapi.FullNames(p))
 		root := qRootFor(p)
 		if root == "" {
 			res.Failed[p] = "volume"

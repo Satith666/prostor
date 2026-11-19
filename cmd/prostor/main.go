@@ -36,6 +36,7 @@ func hasArg(name string) bool {
 
 func main() {
 	exePath, _ = os.Executable()
+	longEnv()
 	initForbidden()
 	loadStore()
 	isAdmin = winapi.IsAdmin() && !forceHelper()

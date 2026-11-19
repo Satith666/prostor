@@ -463,7 +463,13 @@ func baitTest(live bool) *BaitReport {
 	}
 
 	s := defaultSettings()
-	s.Excludes = []string{filepath.Join(os.Getenv("TEMP"), "prostor-bait-excluded")}
+	// the exclusion is given in 8.3 form where the disk has short names: the
+	// cleaner walks long names and must still recognise it
+	excl := filepath.Join(os.Getenv("TEMP"), "prostor-bait-excluded")
+	if sp := winapi.ShortPath(excl); sp != "" {
+		excl = sp
+	}
+	s.Excludes = []string{excl}
 	s.DeleteOnReboot = false
 	j := newTestJob()
 	admin := !live || isAdmin
