@@ -178,7 +178,7 @@ function openDialog(html, opts = {}) {
   }
   document.addEventListener('keydown', key, true);
   o.addEventListener('mousedown', (e) => { if (e.target === o && !opts.sticky) close(null); });
-  const f = o.querySelector('.btns .primary, .btns .btn');
+  const f = o.querySelector('.btns .primary') || o.querySelector('.btns .btn');
   if (f) setTimeout(() => f.focus(), 20);
   return { el: o.firstElementChild, close };
 }
@@ -432,13 +432,13 @@ function showCleanResult(res, ids) {
     extra += '</p>';
   }
   const lockBtns = res.locked > 0 && !res.scheduled
-    ? (closable.length && ids ? `<button class="btn" data-v="close">${ic('stop')}Закрыть ${closable.length > 1 ? 'программы' : esc(closable[0].replace(/\.exe$/i, ''))} и повторить</button>` : '')
-      + (S.info && S.info.admin ? `<button class="btn" data-v="reboot">${ic('refresh')}Удалить при перезагрузке</button>` : '')
+    ? (closable.length && ids ? `<button class="btn sm" data-v="close">${ic('stop')}Закрыть ${closable.length > 1 ? 'программы' : esc(closable[0].replace(/\.exe$/i, ''))} и повторить</button>` : '')
+      + (S.info && S.info.admin ? `<button class="btn sm" data-v="reboot">${ic('refresh')}Удалить при перезагрузке</button>` : '')
     : '';
   const d = openDialog(`<h2>${res.freed > 0 ? 'Очистка завершена' : 'Готово'}</h2><div class="big">${fmtSize(res.freed)}</div>
-    <p>Освобождено, удалено ${nFiles(res.files || 0)} ${res.seconds >= 1 ? 'за ' + fmtDur(res.seconds) : 'менее чем за секунду'}.</p>${extra}${items ? `<ul class="reslist">${items}</ul>` : ''}
-    <div class="btns">${lockBtns}${res.journal ? `<button class="btn" data-v="j">${ic('journal')}Список удалённых файлов</button>` : ''}<button class="btn primary" data-v="ok">Готово</button></div>`, { wide: !!lockBtns });
-  $$('.btns button', d.el).forEach((b) => {
+    <p>Освобождено, удалено ${nFiles(res.files || 0)} ${res.seconds >= 1 ? 'за ' + fmtDur(res.seconds) : 'менее чем за секунду'}.</p>${extra}${lockBtns ? `<div class="lockacts">${lockBtns}</div>` : ''}${items ? `<ul class="reslist">${items}</ul>` : ''}
+    <div class="btns">${res.journal ? `<button class="btn" data-v="j">${ic('journal')}Список удалённых файлов</button>` : ''}<button class="btn primary" data-v="ok">Готово</button></div>`);
+  $$('button[data-v]', d.el).forEach((b) => {
     b.onclick = async () => {
       const v = b.dataset.v;
       if (v === 'reboot') {
