@@ -11,6 +11,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -126,6 +127,7 @@ jobs:
       # Те же страницы на английском — проверка, что ничего не осталось без перевода.
       - name: Screenshots (English)
         if: success()
+        timeout-minutes: 6
         continue-on-error: true
         shell: pwsh
         run: |
@@ -143,6 +145,7 @@ jobs:
       # Пробный замер FPS самой программы: проверяет запуск PresentMon и формат его вывода.
       - name: PresentMon smoke test
         if: success()
+        timeout-minutes: 6
         continue-on-error: true
         shell: pwsh
         run: |
@@ -165,11 +168,14 @@ jobs:
       # Установщик: тихая установка для пользователя, повторный запуск WinPulse после неё (как при автообновлении), удаление.
       - name: Installer smoke test
         if: success()
+        timeout-minutes: 6
         continue-on-error: true
         shell: pwsh
         run: |
           $setup = Get-ChildItem release -Filter 'WinPulse-Setup-*.exe' | Select-Object -First 1
-          $p = Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/LANG=ru' -PassThru -Wait
+          # Не -Wait: он ждёт и потомков, а установщик после тихой установки снова запускает WinPulse.
+          $p = Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/LANG=ru' -PassThru
+          if (-not $p.WaitForExit(180000)) { $p.Kill() }
           $dir = Join-Path $env:LOCALAPPDATA 'Programs\WinPulse'
           $files = (Get-ChildItem $dir -ErrorAction SilentlyContinue | ForEach-Object Name) -join ', '
           Start-Sleep 5
@@ -177,28 +183,33 @@ jobs:
           Write-Output "::notice title=Installer::exit $($p.ExitCode); files: $files; relaunched: $running"
           Get-Process WinPulse -ErrorAction SilentlyContinue | Stop-Process -Force
           Start-Sleep 2
-          $u = Start-Process (Join-Path $dir 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES' -PassThru -Wait
-          Start-Sleep 3
+          $u = Start-Process (Join-Path $dir 'unins000.exe') -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES' -PassThru
+          $u.WaitForExit(120000) | Out-Null
+          Start-Sleep 5
           Write-Output "::notice title=Uninstaller::exit $($u.ExitCode); exe left: $(Test-Path (Join-Path $dir 'WinPulse.exe'))"
 
       # Цепочка автообновления: найти выпуск на GitHub, скачать установщик, сверить SHA-256 (без установки).
       - name: Update self-test
         if: success()
+        timeout-minutes: 6
         continue-on-error: true
         shell: pwsh
         run: |
-          $p = Start-Process dist/WinPulse.exe -ArgumentList '--update-selftest', "$PWD\update-selftest.txt" -PassThru -Wait
+          $p = Start-Process dist/WinPulse.exe -ArgumentList '--update-selftest', "$PWD\update-selftest.txt" -PassThru
+          if (-not $p.WaitForExit(180000)) { $p.Kill() }
           Write-Output "::notice title=Update self-test::exit $($p.ExitCode): $((Get-Content update-selftest.txt -ErrorAction SilentlyContinue) -join ' | ')"
 
       # Замер задержек DPC/ISR на раннере (он работает с правами администратора) — проверка ETW-кода на настоящей Windows.
       - name: Latency smoke test
         if: success()
+        timeout-minutes: 6
         continue-on-error: true
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force shots | Out-Null
           $file = Join-Path $PWD "shots/latency-0123456789abcdef0123456789abcdef.json"
-          $p = Start-Process dist/WinPulse.exe -ArgumentList '--latency','5',"`"$file`"" -PassThru -Wait
+          $p = Start-Process dist/WinPulse.exe -ArgumentList '--latency','5',"`"$file`"" -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill() }
           Write-Output "::notice title=Latency exit::$($p.ExitCode)"
           if (Test-Path $file) {
             $r = Get-Content $file -Raw | ConvertFrom-Json

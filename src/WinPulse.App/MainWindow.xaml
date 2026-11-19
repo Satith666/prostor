@@ -69,14 +69,24 @@
         <Border Background="{StaticResource Sidebar}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
             <DockPanel Margin="14,20,14,14">
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,16">
-                    <Border Width="36" Height="36" CornerRadius="11" Background="{StaticResource AccentGradient}" Effect="{StaticResource GlowCyan}">
-                        <Viewbox Width="21" Height="21">
+                    <!-- Логотип как у значка программы: тёмная плитка, «W» из линии пульса с подсветкой -->
+                    <Grid Width="38" Height="38">
+                        <Border CornerRadius="10" BorderThickness="1" BorderBrush="{StaticResource AccentGradient}">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#101A30" Offset="0"/>
+                                    <GradientStop Color="#070B16" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <Viewbox Width="30" Height="30" Effect="{StaticResource GlowCyan}">
                             <Canvas Width="24" Height="24">
-                                <Path Data="M2,12 H6 L8,7 L12,17 L14,12 H22" Stroke="#04111A" StrokeThickness="2.6"
+                                <Path Data="M3.8,12 H6.5 L8.4,7.2 L10.6,16.8 L12,10.1 L13.4,16.8 L15.6,7.2 L17.5,12 H20.2"
+                                      Stroke="{StaticResource AccentGradient}" StrokeThickness="1.9"
                                       StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                             </Canvas>
                         </Viewbox>
-                    </Border>
+                    </Grid>
                     <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="WinPulse" FontFamily="{StaticResource DisplayFont}" FontSize="20" FontWeight="Bold"/>
                         <TextBlock Text="{Binding [app.tagline], Source={x:Static i:Loc.I}}" Style="{StaticResource FaintText}" FontSize="11"/>
