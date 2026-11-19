@@ -42,7 +42,7 @@
 - Этап 2 «Проблемы»: `Core/Diagnostics` (EventItem, DiagnosticInput, Finding, BugChecks, ProblemDetectors — 17 детекторов, хронология), `Collectors/Diagnostics` (EventLogReader на wevtapi, DeviceProblemsReader на cfgmgr32, DiskHealthReader через PowerShell Get-PhysicalDisk, SystemChecks, DiagnosticsCollector), страница `ProblemsView`. Только чтение, ничего не меняет.
 - Этап 3: общий движок `FixModule` (Optimizer) и `FixModuleViewModel`/`FixModuleView` (App) для «Игр в окне» и «Оптимизации Windows» (`Optimizer/Optimization`, 8 пунктов); «Автозагрузка» (`Core/Startup`: CommandLine, StartupApproved, StartupKnowledge; `Optimizer/Startup/StartupManager`; `Optimizer/Platform/ScheduledTasks` на COM), ChangeKind.TaskEnabled. Этап 5 частично: «Драйверы» (`Core/Drivers`, `Collectors/Drivers/DriverInventory`). Описание: `docs/Оптимизация_и_автозагрузка.md`.
 - Модуль «Игры в окне»: `WinPulse.Optimizer` — `Change`, `BackupStore`, `ChangeExecutor`, `ElevatedRunner/ElevatedHost` (`--elevated-ops`, белый список), `PowerSchemes`, 13 пунктов; страница с RU/EN. Описание: `docs/Игры_в_окне_как_сделано.md`.
-Первым делом попроси меня запустить `build.cmd` и прислать `build-errors.txt`; исправь ошибки. Если у тебя есть .NET SDK — собирай сам.
+Код лежит в GitHub: репозиторий Satith666/prostor, ветка `winpulse` (orphan, не связана с `main` — там другой проект, Prostor, его не трогать). GitHub Actions собирает exe и гоняет тесты на windows-latest; ошибки компилятора видны без авторизации через API `/repos/Satith666/prostor/check-runs/<job_id>/annotations`. Первая полная сборка прошла (коммит fa1c997). Дальше — проверка на живой системе: если программа падает, попроси %LOCALAPPDATA%\WinPulse\logs\winpulse.log.
 
 ## Порядок работы
 1. Довести сборку до зелёной.
