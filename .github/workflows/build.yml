@@ -29,7 +29,20 @@ jobs:
 
       - name: Tests
         if: always()
-        run: dotnet test tests/WinPulse.Core.Tests/WinPulse.Core.Tests.csproj -c Release -nologo
+        shell: pwsh
+        run: |
+          dotnet test tests/WinPulse.Core.Tests/WinPulse.Core.Tests.csproj -c Release -nologo --logger "console;verbosity=normal" *> test-output.txt
+          $code = $LASTEXITCODE
+          Get-Content test-output.txt
+          # Упавшие тесты — аннотациями, чтобы их было видно без входа в GitHub
+          $lines = Get-Content test-output.txt
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^\s*Failed\s+(\S+)') {
+              $msg = ($lines[$i..([Math]::Min($i + 8, $lines.Count - 1))] -join ' | ') -replace '\s+', ' '
+              Write-Output "::error title=Test failed::$msg"
+            }
+          }
+          exit $code
 
       - uses: actions/upload-artifact@v4
         if: failure()
