@@ -22,8 +22,13 @@ type DirEnt struct {
 	Attr  uint32 // FILE_ATTRIBUTE_*
 	ID    uint64 // NTFS file id; equal for hard links of one file (0 = unknown)
 	IsDir bool
-	Link  bool // junction, symlink or mount point: never followed
+	Link  bool   // junction, symlink or mount point: never followed
+	Tag   uint32 // reparse tag (0 = none); TagWOF: compressed by Windows
 }
+
+// TagWOF marks files compressed by Windows (CompactOS, compact /exe): the
+// folder listing keeps their size from before compression.
+const TagWOF = 0x80000017
 
 const (
 	classIDBothDir        = 10 // FileIdBothDirectoryInfo
@@ -135,6 +140,7 @@ func ReadDir(dir string) ([]DirEnt, error) {
 				if attr&attrReparse != 0 {
 					tag := binary.LittleEndian.Uint32(b[off+64:]) // EaSize holds the reparse tag
 					d.Link = tag&0x20000000 != 0                  // name surrogate: junction, symlink, mount point
+					d.Tag = tag
 				}
 				if d.IsDir {
 					d.Size, d.Alloc = 0, 0

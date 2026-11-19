@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -121,49 +120,66 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 		if n == nil {
 			return failf("папка %s не найдена в таблице файлов", sr)
 		}
-		j := newTestJob()
-		timer := time.AfterFunc(10*time.Minute, j.Cancel)
-		defer timer.Stop()
-		w := newAnalysis(sr, j)
-		w.run()
-		if j.Cancelled() {
+		// the reference: every file asked for its own size on disk (the folder
+		// listing keeps outdated sizes for files Windows compressed later)
+		start := time.Now()
+		tFiles, tSize, lSize, denied := trueFolderSize(sr, 10*time.Minute)
+		if denied < 0 {
 			return warnf("обход папки Windows не закончился за 10 минут")
 		}
-		df := pctDiff(mFiles, w.root.files)
-		ds := pctDiff(mSize, w.root.size)
-		if df > 1 || ds > 1 {
-			// where the difference is: the subfolders that differ most
-			a.treeMu.RLock()
-			type d struct {
-				name string
-				m, w int64
-			}
-			var diffs []d
-			wk := map[string]int64{}
-			for _, c := range w.root.children {
-				wk[lower(c.name)] = c.size
-			}
-			wk["(файлы в корне)"] = w.root.own
-			for _, c := range n.children {
-				diffs = append(diffs, d{c.name, c.size, wk[lower(c.name)]})
-			}
-			diffs = append(diffs, d{"(файлы в корне)", n.own, w.root.own})
-			a.treeMu.RUnlock()
-			sort.Slice(diffs, func(i, j int) bool { return abs64(diffs[i].m-diffs[i].w) > abs64(diffs[j].m-diffs[j].w) })
-			var parts []string
-			for _, x := range diffs[:min(6, len(diffs))] {
-				parts = append(parts, fmt.Sprintf("%s: MFT %s, обход %s", x.name, human(x.m), human(x.w)))
-			}
-			return failf("MFT: %d файлов, %s; обход: %d файлов, %s — расхождение %.2f%% по числу и %.2f%% по размеру. Больше всего отличаются: %s",
-				mFiles, human(mSize), w.root.files, human(w.root.size), df, ds, strings.Join(parts, "; "))
-		}
-		msg := fmt.Sprintf("MFT: %d файлов, %s; обход: %d файлов, %s (без доступа папок: %d) — расхождение %.2f%% по числу и %.2f%% по размеру",
-			mFiles, human(mSize), w.root.files, human(w.root.size), w.denied.Load(), df, ds)
+		df := pctDiff(mFiles, tFiles)
+		ds := pctDiff(mSize, tSize)
+		msg := fmt.Sprintf("MFT: %d файлов, %s; обход с размером от каждого файла: %d файлов, %s (по списку папок %s, папок без доступа %d) — расхождение %.2f%% по числу и %.2f%% по размеру, обход занял %s",
+			mFiles, human(mSize), tFiles, human(tSize), human(lSize), denied, df, ds, secRu(time.Since(start).Seconds()))
 		if df > 1 || ds > 1 {
 			return failf("%s, допустимо до 1%%", msg)
 		}
 		return okf("%s", msg)
 	})
+}
+
+// trueFolderSize walks a folder, counts every file once (hard links by file
+// id, as the MFT does) and takes each file's size on disk from the file
+// itself. lSize is the same by the folder listing. denied < 0: time ran out.
+func trueFolderSize(root string, limit time.Duration) (files, size, lSize int64, denied int) {
+	deadline := time.Now().Add(limit)
+	seen := map[uint64]bool{}
+	stack := []string{root}
+	for len(stack) > 0 {
+		if time.Now().After(deadline) {
+			return 0, 0, 0, -1
+		}
+		d := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		ents, err := winapi.ReadDir(d)
+		if err != nil {
+			denied++
+			continue
+		}
+		for _, e := range ents {
+			p := filepath.Join(d, e.Name)
+			switch {
+			case e.Link:
+			case e.IsDir:
+				stack = append(stack, p)
+			default:
+				if e.ID != 0 {
+					if seen[e.ID] {
+						continue
+					}
+					seen[e.ID] = true
+				}
+				files++
+				lSize += e.Alloc
+				if al, _, err := winapi.FileAlloc(p); err == nil {
+					size += al
+				} else {
+					size += e.Alloc
+				}
+			}
+		}
+	}
+	return
 }
 
 func pctDiff(a, b int64) float64 {
@@ -215,13 +231,6 @@ func mftFileDiffs(dir string) string {
 	}
 	walk(dir)
 	return strings.Join(out, "; ")
-}
-
-func abs64(x int64) int64 {
-	if x < 0 {
-		return -x
-	}
-	return x
 }
 
 // wofChecks looks at files Windows itself compressed (CompactOS): how big

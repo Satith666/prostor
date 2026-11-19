@@ -331,6 +331,12 @@ func (a *Analysis) scanDir(t walkTask) []walkTask {
 			continue
 		}
 		size := e.Alloc
+		if e.Tag == winapi.TagWOF {
+			// compressed by Windows: the listing still shows the size before compression
+			if al, _, err := winapi.FileAlloc(filepath.Join(t.path, e.Name)); err == nil {
+				size = al
+			}
+		}
 		if e.Attr&attrCloudMask != 0 && e.Alloc < e.Size {
 			a.cloud.Add(e.Size - e.Alloc)
 		}

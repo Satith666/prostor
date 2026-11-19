@@ -16,6 +16,7 @@ type DirEnt struct {
 	ID    uint64
 	IsDir bool
 	Link  bool
+	Tag   uint32
 }
 
 func LongPath(p string) string { return p }
@@ -50,3 +51,6 @@ func EnableBackupPrivilege() bool { return false }
 
 func Console(alloc bool, title string) (ok, created bool) { return true, false }
 func WaitEnter()                                          {}
+
+// TagWOF marks files compressed by Windows (never on other systems).
+const TagWOF = 0x80000017
