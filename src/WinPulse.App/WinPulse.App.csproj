@@ -8,6 +8,7 @@
     <RootNamespace>WinPulse.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\WinPulse.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,5 +16,17 @@
     <ProjectReference Include="..\WinPulse.Collectors\WinPulse.Collectors.csproj" />
     <ProjectReference Include="..\WinPulse.Optimizer\WinPulse.Optimizer.csproj" />
   </ItemGroup>
+
+  <!--
+    NvAPIWrapper (LGPL-3.0) не зашиваем внутрь WinPulse.exe: библиотека лежит рядом отдельным файлом,
+    и её можно заменить своей сборкой, как требует LGPL.
+  -->
+  <Target Name="KeepLgplOutsideBundle" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'NvAPIWrapper.dll'">
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>

@@ -64,6 +64,8 @@ public sealed class AppSettings
     /// <summary>Игровой режим: включать самому, когда WinPulse замечает игру.</summary>
     public bool AutoBoost { get; set; }
     public WinPulse.Optimizer.Gaming.BoostOptions Boost { get; set; } = new();
+    /// <summary>Проверять новые выпуски на GitHub при запуске (один запрос к api.github.com).</summary>
+    public bool CheckUpdates { get; set; } = true;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 

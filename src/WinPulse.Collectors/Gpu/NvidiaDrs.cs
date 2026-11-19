@@ -23,6 +23,11 @@ public static class NvidiaDrs
     public const uint ShaderCacheSize = 0x00AC8497;
 
     private static readonly object Lock = new();
+
+    // Отдельный метод: если NvAPIWrapper.dll рядом нет, ошибка загрузки возникнет здесь, внутри try у Available,
+    // а не при компиляции вызывающего метода.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void Initialize() => NVIDIA.Initialize();
     private static bool? _available;
 
     /// <summary>NVAPI загрузился (есть видеокарта NVIDIA и её драйвер).</summary>
@@ -36,7 +41,7 @@ public static class NvidiaDrs
                 {
                     try
                     {
-                        NVIDIA.Initialize();
+                        Initialize();
                         _available = true;
                     }
                     catch (Exception ex)

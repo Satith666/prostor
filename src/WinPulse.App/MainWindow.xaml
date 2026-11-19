@@ -120,6 +120,11 @@
                             <TextBlock Text="{Binding [shell.log], Source={x:Static i:Loc.I}}" FontSize="12"/>
                         </Button>
                     </StackPanel>
+                    <Button Style="{StaticResource BtnPrimary}" HorizontalAlignment="Left" Margin="0,8,0,0" Padding="12,5"
+                            Command="{Binding UpdateCommand}"
+                            Visibility="{Binding UpdateText, Converter={StaticResource NullToVis}}">
+                        <TextBlock Text="{Binding UpdateText}" FontSize="12"/>
+                    </Button>
                 </StackPanel>
 
                 <!-- Пункты меню -->

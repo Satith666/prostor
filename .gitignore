@@ -7,3 +7,4 @@ TestResults/
 build-errors.txt
 test-log.txt
 .dotnet/
+release/

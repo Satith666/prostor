@@ -10,6 +10,7 @@ using WinPulse.Collectors.Gaming;
 using WinPulse.Core;
 using WinPulse.Core.Formatting;
 using WinPulse.Core.Gaming;
+using WinPulse.Core.Updates;
 
 namespace WinPulse.App.ViewModels;
 
@@ -66,6 +67,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 {
     private readonly MonitorEngine _engine;
     private readonly AppSettings _settings;
+    private UpdateInfo? _update;
+    private bool _updating;
+    private string? _updateText;
     private readonly Dispatcher _dispatcher;
     private readonly CancellationTokenSource _cts = new();
     private readonly object _engineLock = new();
@@ -160,7 +164,11 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             foreach (var n in Nav) n.RefreshTexts();
             OnPropertyChanged(nameof(RightsText));
+            if (_update is not null && !_updating) UpdateText = UpdateLabel(_update);
         };
+
+        UpdateCommand = new AsyncCommand(UpdateAsync, () => _update is not null && !_updating);
+        if (!IsDemo && settings.CheckUpdates) _ = CheckUpdatesAsync();
 
         OpenLogCommand = new RelayCommand(OpenLog);
         RestartAsAdminCommand = new RelayCommand(RestartAsAdmin, () => !IsElevated);
@@ -177,8 +185,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public bool IsElevated { get; }
     public bool IsDemo { get; }
     public string RightsText => IsElevated ? Loc.Get("shell.admin") : Loc.Get("shell.user");
-    public string VersionText => "WinPulse " + (typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "");
+    public string VersionText => "WinPulse " + Updater.CurrentText;
     public ICommand OpenLogCommand { get; }
+    public ICommand UpdateCommand { get; }
+    public string? UpdateText { get => _updateText; private set => Set(ref _updateText, value); }
     public ICommand RestartAsAdminCommand { get; }
 
     public PageViewModel? CurrentPage { get => _page; private set => Set(ref _page, value); }
@@ -346,6 +356,74 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             Log.Error("open-log", ex);
+        }
+    }
+
+    private static string UpdateLabel(UpdateInfo u) =>
+        Lang.T($"Доступна версия {u.Version.ToString(3)}", $"Version {u.Version.ToString(3)} available");
+
+    private async Task CheckUpdatesAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(8));
+            var update = await Updater.CheckAsync();
+            if (update is null) return;
+            _update = update;
+            UpdateText = UpdateLabel(update);
+            CommandManager.InvalidateRequerySuggested();
+            Log.Info($"update available: {update.Tag}");
+        }
+        catch (Exception ex)
+        {
+            // Нет сети или GitHub недоступен — не мешаем работе, просто пишем в журнал.
+            Log.Info("update check: " + ex.Message);
+        }
+    }
+
+    private async Task UpdateAsync()
+    {
+        var u = _update;
+        if (u is null) return;
+        string version = u.Version.ToString(3);
+        if (!Updater.IsInstalled || u.SetupUrl is null)
+        {
+            // Переносная версия: обновлять файлы на месте не берёмся — открываем страницу выпуска.
+            DriverRowVm.Open(u.PageUrl);
+            return;
+        }
+
+        string notes = u.Notes.Trim();
+        if (notes.Length > 700) notes = notes[..700] + "…";
+        bool ok = await WinPulse.App.Dialogs.MessageDialog.ConfirmAsync(
+            Lang.T($"Обновить WinPulse до {version}?", $"Update WinPulse to {version}?"),
+            (notes.Length > 0 ? notes + "\n\n" : "") + Lang.T(
+                "WinPulse скачает установщик с GitHub, сверит контрольную сумму и поставит новую версию поверх. Настройки, история и резервные копии сохранятся. Программа закроется и через несколько секунд откроется снова.",
+                "WinPulse will download the installer from GitHub, verify its checksum and install the new version over this one. Settings, history and backups are kept. The app will close and reopen in a few seconds."),
+            Lang.T("Обновить", "Update"));
+        if (!ok) return;
+
+        _updating = true;
+        CommandManager.InvalidateRequerySuggested();
+        try
+        {
+            var progress = new Progress<double>(p => UpdateText = Lang.T($"Скачиваю… {p:P0}", $"Downloading… {p:P0}"));
+            string path = await Updater.DownloadAsync(u, progress);
+            UpdateText = Lang.T("Устанавливаю…", "Installing…");
+            Log.Info($"update: running {path}");
+            Updater.RunInstaller(path);
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("update", ex);
+            UpdateText = UpdateLabel(u);
+            WinPulse.App.Dialogs.MessageDialog.Show(Lang.T("Обновление не удалось", "Update failed"), ex.Message);
+        }
+        finally
+        {
+            _updating = false;
+            CommandManager.InvalidateRequerySuggested();
         }
     }
 

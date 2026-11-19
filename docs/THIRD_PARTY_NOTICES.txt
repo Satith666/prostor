@@ -1,0 +1,50 @@
+WinPulse — сторонние компоненты / Third-party components
+=========================================================
+
+WinPulse использует следующие открытые компоненты. Их лицензии и исходный код доступны по ссылкам.
+WinPulse uses the following open-source components. Their licenses and source code are available at the links.
+
+
+PresentMon (Intel) — MIT License
+https://github.com/GameTechDev/PresentMon
+Поставляется рядом с WinPulse.exe отдельным файлом PresentMon-*.exe без изменений.
+Shipped unmodified next to WinPulse.exe as PresentMon-*.exe.
+
+  Copyright (C) 2017-2024 Intel Corporation
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+  associated documentation files (the "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the
+  following conditions: The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+  LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+
+NvAPIWrapper.Net (falahati) — GNU Lesser General Public License v3.0
+https://github.com/falahati/NvAPIWrapper
+Поставляется без изменений отдельным файлом NvAPIWrapper.dll рядом с WinPulse.exe — его можно заменить
+своей сборкой библиотеки. Текст лицензии: https://www.gnu.org/licenses/lgpl-3.0.txt
+Shipped unmodified as a separate NvAPIWrapper.dll next to WinPulse.exe — you may replace it with your own
+build of the library. License text: https://www.gnu.org/licenses/lgpl-3.0.txt
+
+
+LibreHardwareMonitorLib — Mozilla Public License 2.0
+https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+Используется без изменений. Исходный код — по ссылке выше. Текст лицензии: https://mozilla.org/MPL/2.0/
+Used unmodified. Source code at the link above. License text: https://mozilla.org/MPL/2.0/
+
+
+HidSharp (зависимость LibreHardwareMonitorLib / dependency of LibreHardwareMonitorLib) — Apache License 2.0
+https://www.zer7.com/software/hidsharp
+Текст лицензии / License text: https://www.apache.org/licenses/LICENSE-2.0
+
+
+.NET Runtime and Windows Desktop (Microsoft) — MIT License
+https://github.com/dotnet/runtime, https://github.com/dotnet/wpf
+
+
+Ссылки на сторонние проекты (не входят в WinPulse) / Linked, not included:
+DLSS Swapper (GPL-3.0) https://github.com/beeradmoore/dlss-swapper
+OptiScaler (GPL-3.0) https://github.com/optiscaler/OptiScaler
+LatencyMon https://www.resplendence.com/latencymon
