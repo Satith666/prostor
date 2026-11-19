@@ -220,7 +220,9 @@ func build(cluster int, mftRuns []run, files []fileSpec) []byte {
 	}
 	mft := make([]byte, mftLen)
 	for _, f := range files {
-		copy(mft[f.num*1024:], m.record(f, mftRuns))
+		if int64(f.num+1)*1024 <= mftLen { // the small image holds fewer records
+			copy(mft[f.num*1024:], m.record(f, mftRuns))
+		}
 	}
 	off := int64(0)
 	for _, r := range mftRuns {
@@ -249,6 +251,11 @@ func sample() []fileSpec {
 		{num: 25, inUse: true, names: []fname{{16, "broken.bin", 3}}, resident: []byte("zz"), corrupt: true},
 		{num: 26, inUse: true, names: []fname{{16, "cloud.docx", 3}}, nonRes: &[3]int64{900000, 0, 0}, reparse: 0x9000001A, attr: 0x400420},
 		{num: 27, inUse: true, names: []fname{{16, "compact.dll", 3}}, nonRes: &[3]int64{300000, 0, 0}, reparse: tagWOF, wof: 98304},
+		// a compressed file whose streams and tag all sit in extension records
+		{num: 30, inUse: true, names: []fname{{16, "OSClient.NET.dll", 3}}},
+		{num: 31, inUse: true, base: 30, wof: 12812288},
+		{num: 32, inUse: true, base: 30, nonRes: &[3]int64{40000000, 0, 0}, reparse: tagWOF},
+		{num: 33, inUse: true, base: 30, names: []fname{{RecRoot, "second-link.dll", 1}}},
 	}
 }
 
@@ -293,6 +300,11 @@ func check(t *testing.T, recs []Rec) {
 	}
 	if r := get(27); r.Link || !r.WOF || r.Size != 300000 || r.Alloc != 98304 {
 		t.Errorf("file compressed by Windows (WOF): %+v", r)
+	}
+	if len(recs) > 33 {
+		if r := get(30); !r.WOF || r.Size != 40000000 || r.Alloc != 12812288 || r.Links != 2 || r.Name != "OSClient.NET.dll" {
+			t.Errorf("compressed file spread over extension records: %+v", r)
+		}
 	}
 }
 

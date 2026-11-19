@@ -41,6 +41,7 @@ type Rec struct {
 	Dir    bool
 	Link   bool // junction, symlink or mount point (name surrogate reparse point)
 	WOF    bool // compressed by Windows (CompactOS, compact /exe)
+	wof    int64
 }
 
 // Volume is an opened NTFS volume.
@@ -469,10 +470,11 @@ func parseRecord(rec []byte, r *Rec) (ext *extPart, inUse bool) {
 		r.Link = p.reparseTag&0x20000000 != 0
 		if p.reparseTag == tagWOF {
 			r.WOF = true
-			if p.wofAlloc > 0 {
-				r.Alloc = p.wofAlloc // the real data lives in the compressed stream
-			}
 		}
+	}
+	r.wof = p.wofAlloc
+	if r.WOF && r.wof > 0 {
+		r.Alloc = r.wof // the real data lives in the compressed stream
 	}
 	if r.Dir {
 		r.Size, r.Alloc = 0, 0
@@ -601,7 +603,8 @@ func (v *Volume) Scan(progress Progress, cancel func() bool) ([]Rec, error) {
 	if readErr != nil {
 		return nil, readErr
 	}
-	// extension records: data streams and names that did not fit in the base record
+	// extension records: data streams and names that did not fit in the base
+	// record (in any order: the compressed stream is applied last)
 	for _, e := range exts {
 		if e.base >= uint64(len(recs)) {
 			continue
@@ -614,14 +617,22 @@ func (v *Volume) Scan(progress Progress, cancel func() bool) ([]Rec, error) {
 			}
 		}
 		r.Links += e.links
-		if e.wofAlloc > 0 && r.Alloc == 0 && !r.Dir {
-			r.Alloc = e.wofAlloc
+		if e.wofAlloc > r.wof {
+			r.wof = e.wofAlloc
 		}
 		if e.name != "" && r.Name == "" {
 			r.Name, r.Parent = e.name, e.parent
 		}
 		if e.hasReparseTag {
 			r.Link = e.reparseTag&0x20000000 != 0
+			if e.reparseTag == tagWOF {
+				r.WOF = true
+			}
+		}
+	}
+	for i := range recs {
+		if r := &recs[i]; r.WOF && r.wof > 0 && !r.Dir {
+			r.Alloc = r.wof
 		}
 	}
 	return recs, nil

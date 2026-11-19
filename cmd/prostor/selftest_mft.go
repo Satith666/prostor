@@ -132,6 +132,11 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 		}
 		df := pctDiff(mFiles, tFiles)
 		ds := pctDiff(mSize, tSize)
+		if cmp.files > 0 {
+			// sizes are compared file by file: hard links may be listed under
+			// another folder, and files written to meanwhile are left out
+			ds = pctDiff(cmp.sumMF, cmp.sumFile)
+		}
 		msg := fmt.Sprintf("MFT: %d файлов, %s; обход с размером от каждого файла: %d файлов, %s (по списку папок %s, папок без доступа %d) — расхождение %.2f%% по числу и %.2f%% по размеру, обход занял %s",
 			mFiles, human(mSize), tFiles, human(tSize), human(lSize), denied, df, ds, secRu(time.Since(start).Seconds()))
 		msg += ". " + cmp.report()
@@ -145,9 +150,13 @@ func (t *selfTest) mftChecks(mft bool, dir, linked string, setupErr error) {
 // recCompare compares each file's size from its own handle with its MFT
 // record from the drive scan, grouped by what kind of file it is.
 type recCompare struct {
-	recs  []ntfs.Rec
-	kinds map[string]*[3]int64 // files, handle bytes, MFT bytes
-	worst []recDiff
+	recs           []ntfs.Rec
+	kinds          map[string]*[3]int64 // files, handle bytes, MFT bytes
+	worst          []recDiff
+	files          int64
+	sumFile, sumMF int64 // files that did not change between the two readings
+	changed        int64 // files whose logical size changed since the MFT was read
+	changedBytes   int64
 }
 
 type recDiff struct {
@@ -165,6 +174,15 @@ func (c *recCompare) add(path string, e winapi.DirEnt, handleAlloc int64) {
 		return
 	}
 	r := c.recs[id]
+	if r.Name != "" && !r.Dir && r.Size != e.Size {
+		// written to after the MFT was read (registry logs, event logs)
+		c.changed++
+		c.changedBytes += abs64(handleAlloc - r.Alloc)
+		return
+	}
+	c.files++
+	c.sumFile += handleAlloc
+	c.sumMF += r.Alloc
 	var kind string
 	switch {
 	case r.WOF:
@@ -219,10 +237,12 @@ func (c *recCompare) report() string {
 	for _, w := range c.worst {
 		ws = append(ws, fmt.Sprintf("%s (%s) %d/%d", w.path, w.kind, w.file, w.mft))
 	}
+	head := fmt.Sprintf("По файлам (%d, без %d изменившихся за время проверки): от самих файлов %s, из MFT %s — расхождение %.2f%%",
+		c.files, c.changed, human(c.sumFile), human(c.sumMF), pctDiff(c.sumMF, c.sumFile))
 	if len(parts) == 0 {
-		return "по каждому файлу размер из MFT совпадает с размером от самого файла"
+		return head + "; размер каждого файла совпадает"
 	}
-	return "Расходятся: " + strings.Join(parts, "; ") + ". Больше всего: " + strings.Join(ws, "; ")
+	return head + ". Расходятся: " + strings.Join(parts, "; ") + ". Больше всего: " + strings.Join(ws, "; ")
 }
 
 func abs64(x int64) int64 {
