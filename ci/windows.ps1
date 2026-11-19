@@ -56,6 +56,10 @@ switch ($Step) {
         $base = $url -replace '/\?t=.*$', ''; $tok = $url -replace '^.*[?&]t=', ''
         $info = Invoke-RestMethod -Uri "$base/api/info" -Headers @{ 'X-Token' = $tok }
         Write-Host "admin=$($info.admin) helper=$($info.helper)"
+        # a known old file in Windows\Temp: the scan through the helper must find it
+        $plant = "$env:SystemRoot\Temp\prostor-ci-helper.tmp"
+        [IO.File]::WriteAllBytes($plant, (New-Object byte[] 1048576))
+        (Get-Item $plant).LastWriteTime = (Get-Date).AddDays(-30)
         Invoke-RestMethod -Method Post -Uri "$base/api/clean/scan" -Headers @{ 'X-Token' = $tok } -ContentType 'application/json' -Body '{"IDs":["win_temp","wu_cache"]}' | Out-Null
         $job = $null
         for ($i = 0; $i -lt 120; $i++) {
@@ -64,7 +68,9 @@ switch ($Step) {
             if ($job.exists -and -not $job.running) { break }
         }
         foreach ($it in $job.result) { Write-Host "поиск через помощника: $($it.id) found=$($it.found) size=$($it.size) files=$($it.files)" }
-        $scanOK = $job.exists -and -not $job.running -and -not $job.err -and @($job.result).Count -ge 1
+        $wt = @($job.result) | Where-Object { $_.id -eq 'win_temp' }
+        $scanOK = $job.exists -and -not $job.running -and -not $job.err -and $wt -and $wt.size -ge 1048576
+        Remove-Item $plant -ErrorAction SilentlyContinue
         $p.Kill()
         $left = $null
         for ($i = 0; $i -lt 40; $i++) {
