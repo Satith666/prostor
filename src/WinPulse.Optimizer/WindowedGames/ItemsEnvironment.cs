@@ -106,11 +106,11 @@ public sealed class GpuAppsItem : FixItem
     {
         if (actionId.StartsWith("start:", StringComparison.Ordinal))
         {
-            string path = actionId[6..];
+            string startPath = actionId[6..];
             try
             {
-                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(path) ?? "" });
-                _closed.Remove(path);
+                Process.Start(new ProcessStartInfo(startPath) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(startPath) ?? "" });
+                _closed.Remove(startPath);
             }
             catch (Exception ex)
             {
