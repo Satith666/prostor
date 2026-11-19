@@ -963,3 +963,15 @@ func FullNames(p string) string {
 
 // ShortPath returns the 8.3 form of an existing path ("" if unavailable).
 func ShortPath(p string) string { return pathCall(procGetShortPathNameW, p) }
+
+// RegKeyExists checks a key in the 64-bit and the 32-bit view of the registry.
+func RegKeyExists(root Root, path string) bool {
+	for _, view := range []uint32{0x0100, 0x0200} { // KEY_WOW64_64KEY, KEY_WOW64_32KEY
+		var h syscall.Handle
+		if syscall.RegOpenKeyEx(syscall.Handle(root), u16(path), 0, syscall.KEY_QUERY_VALUE|view, &h) == nil {
+			syscall.RegCloseKey(h)
+			return true
+		}
+	}
+	return false
+}

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"prostor/internal/cdp"
+	"prostor/internal/rules"
 	"prostor/internal/webui"
 	"prostor/internal/webview2"
 	"prostor/internal/winapi"
@@ -408,11 +409,11 @@ func (t *selfTest) cleanerChecks() {
 		var bad []string
 		n := 0
 		for i := range targets {
-			for _, p := range targets[i].Paths {
+			for _, l := range targets[i].Locs {
 				n++
-				e := expandPath(p)
+				e := expandPath(l.Path)
 				if e != "" && !filepath.IsAbs(e) {
-					bad = append(bad, targets[i].Name+": "+p)
+					bad = append(bad, targets[i].Name+": "+l.Path)
 				}
 			}
 		}
@@ -435,8 +436,9 @@ func (t *selfTest) cleanerChecks() {
 		}
 		var bad []string
 		roots := 0
+		dc := newDirCache()
 		for i := range targets {
-			for _, r := range resolveRoots(&targets[i]) {
+			for _, r := range resolveRoots(&targets[i], dc) {
 				roots++
 				lp := lower(r.path)
 				for _, p := range protect {
@@ -483,7 +485,7 @@ func (t *selfTest) cleanerChecks() {
 		setupErr = err
 	}
 	linkErr := makeLink(filepath.Join(base, "link"), filepath.Dir(victim))
-	tg := &Target{ID: "selftest", Name: "Тестовая папка", Paths: []string{base}, Recent: true}
+	tg := &Target{ID: "selftest", Name: "Тестовая папка", Locs: []rules.Loc{{Path: base}}, Recent: true}
 	s := defaultSettings()
 	s.SkipRecentHours = 24
 	s.Excludes = []string{filepath.Join(base, "keep")}
@@ -492,7 +494,7 @@ func (t *selfTest) cleanerChecks() {
 		if setupErr != nil {
 			return failf("не удалось создать тестовые файлы: %v", setupErr)
 		}
-		it := scanTarget(tg, s, nil)
+		it := scanTarget(tg, s, nil, nil, nil)
 		if it.Size != expect || it.Files != 3 {
 			return failf("найдено %s в %d файлах, ожидалось %s в 3", human(it.Size), it.Files, human(expect))
 		}
@@ -552,11 +554,16 @@ func (t *selfTest) cleanerChecks() {
 	os.Remove(filepath.Join(base, "link")) // only the link itself
 
 	t.check("Поиск мусора", "Сканирование всех пунктов очистки", func() (string, string) {
-		var ids []string
-		for i := range targets {
-			ids = append(ids, targets[i].ID)
-		}
 		st := time.Now()
+		list := offered(newDirCache())
+		var ids []string
+		imported := 0
+		for _, tg := range list {
+			ids = append(ids, tg.ID)
+			if tg.Source != "" {
+				imported++
+			}
+		}
 		items := scanTargets(newTestJob(), ids, getSettings(), map[uint32]bool{})
 		var total, files int64
 		found := 0
@@ -571,9 +578,13 @@ func (t *selfTest) cleanerChecks() {
 		if len(items) != len(ids) {
 			return failf("результатов %d из %d", len(items), len(ids))
 		}
-		msg := fmt.Sprintf("найдено %s в %d файлах, %d из %d пунктов есть на компьютере, за %s", human(total), files, found, len(ids), secRu(took.Seconds()))
-		if took > 90*time.Second {
-			return warnf("%s — дольше обычного", msg)
+		msg := fmt.Sprintf("правил %d (из базы Winapp2 подошли к этому компьютеру %d из %d), найдено %s в %d файлах за %s",
+			len(ids), imported, rulesInfo.Imported, human(total), files, secRu(took.Seconds()))
+		switch {
+		case took > 15*time.Second:
+			return failf("%s — цель до 5 с", msg)
+		case took > 5*time.Second:
+			return warnf("%s — дольше цели в 5 с", msg)
 		}
 		return okf("%s", msg)
 	})

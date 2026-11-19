@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"prostor/internal/rules"
 	"strings"
 	"testing"
 )
@@ -97,15 +98,17 @@ func TestEveryTargetHasSaneDefinition(t *testing.T) {
 		if !cats[tg.Cat] {
 			t.Errorf("target %s: unknown category %s", tg.ID, tg.Cat)
 		}
-		if len(tg.Paths) == 0 && tg.Special == "" {
+		if len(tg.Locs) == 0 && tg.Special == "" {
 			t.Errorf("target %s: no paths", tg.ID)
 		}
-		for _, m := range tg.Masks {
-			if m != strings.ToLower(m) {
-				t.Errorf("target %s: mask %q must be lowercase", tg.ID, m)
-			}
-			if _, err := filepath.Match(m, "x"); err != nil {
-				t.Errorf("target %s: bad mask %q", tg.ID, m)
+		for _, l := range tg.Locs {
+			for _, m := range l.Masks {
+				if m != strings.ToLower(m) {
+					t.Errorf("target %s: mask %q must be lowercase", tg.ID, m)
+				}
+				if _, err := filepath.Match(m, "x"); err != nil {
+					t.Errorf("target %s: bad mask %q", tg.ID, m)
+				}
 			}
 		}
 	}
@@ -270,7 +273,7 @@ func TestCleanTargetWritesJournal(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	tg := &Target{ID: "testcache", Name: "Тестовый кэш", Paths: []string{`%LOCALAPPDATA%\TestCache`}}
+	tg := &Target{ID: "testcache", Name: "Тестовый кэш", Locs: []rules.Loc{{Path: `%LOCALAPPDATA%\TestCache`}}}
 	jr := openJournal("clean")
 	ci := cleanTarget(newTestJob(), tg, defaultSettings(), false, jr)
 	id := jr.close()
@@ -308,10 +311,19 @@ func runBait(t *testing.T) *BaitReport {
 	return baitTest(false)
 }
 
+// withTargets lets a test change the rules (deep copy of folders, so the
+// change does not leak into other tests).
 func withTargets(t *testing.T, change func()) {
-	saved := append([]Target(nil), targets...)
-	t.Cleanup(func() { targets = saved })
+	saved := targets
+	targets = make([]Target, len(saved))
+	for i, tg := range saved {
+		tg.Locs = append([]rules.Loc(nil), tg.Locs...)
+		targets[i] = tg
+	}
+	t.Cleanup(func() { targets = saved; indexTargets() })
+	indexTargets()
 	change()
+	indexTargets()
 }
 
 func TestBaitSandboxPasses(t *testing.T) {
@@ -319,7 +331,7 @@ func TestBaitSandboxPasses(t *testing.T) {
 	if !r.ok() {
 		t.Fatalf("bait test failed: err=%q damaged=%d junkLeft=%v journal=%v", r.Error, len(r.Damaged), r.JunkLeft, r.JournalOK)
 	}
-	if r.Rules < 40 || r.Baits < 150 || r.Junk < 500 {
+	if r.Rules < 500 || r.Baits < 1000 || r.Junk < 3000 {
 		t.Fatalf("too little was exercised: %+v", r)
 	}
 }
@@ -327,7 +339,7 @@ func TestBaitSandboxPasses(t *testing.T) {
 func TestBaitCatchesTooBroadRule(t *testing.T) {
 	withTargets(t, func() {
 		targets = append(targets, Target{ID: "evil", Cat: "browsers", Name: "Слишком широкое правило",
-			Paths: []string{`%LOCALAPPDATA%\Google\Chrome\User Data\Default`}, Risk: "safe"})
+			Locs: []rules.Loc{{Path: `%LOCALAPPDATA%\Google\Chrome\User Data\Default`}}, Risk: "safe"})
 	})
 	r := runBait(t)
 	if len(r.Damaged) == 0 {
@@ -337,10 +349,18 @@ func TestBaitCatchesTooBroadRule(t *testing.T) {
 
 func TestBaitCatchesBrokenFilter(t *testing.T) {
 	cases := map[string]func(*Target){
-		"user_temp": func(t *Target) { t.Recent = false },              // fresh installer files
-		"recent":    func(t *Target) { t.Flat = false; t.Masks = nil }, // pinned jump lists
-		"prefetch":  func(t *Target) { t.Masks = nil },                 // Layout.ini
-		"win_logs":  func(t *Target) { t.MinAge = 0 },                  // logs being written
+		"user_temp": func(t *Target) { t.Recent = false }, // fresh installer files
+		"recent": func(t *Target) { // pinned jump lists
+			for i := range t.Locs {
+				t.Locs[i].Flat, t.Locs[i].Masks = false, nil
+			}
+		},
+		"prefetch": func(t *Target) { // Layout.ini
+			for i := range t.Locs {
+				t.Locs[i].Masks = nil
+			}
+		},
+		"win_logs": func(t *Target) { t.MinAge = 0 }, // logs being written
 	}
 	for id, mutate := range cases {
 		t.Run(id, func(t *testing.T) {
@@ -363,5 +383,41 @@ func TestBaitCatchesIneffectiveRule(t *testing.T) {
 	r := runBait(t)
 	if r.JunkLeft["pip"] == 0 {
 		t.Fatalf("a rule that removes nothing was not caught: %+v", r.JunkLeft)
+	}
+}
+
+// An imported rule that keeps files (Winapp2 ExcludeKey) must keep them:
+// with the walker ignoring rule exclusions the bait test must fail.
+func TestBaitCatchesIgnoredRuleExclusion(t *testing.T) {
+	testIgnoreKeep = true
+	t.Cleanup(func() { testIgnoreKeep = false })
+	r := runBait(t)
+	hit := false
+	for _, b := range r.Damaged {
+		if strings.Contains(b.Why, "исключение правила") {
+			hit = true
+		}
+	}
+	if !hit {
+		t.Fatalf("ignored rule exclusions were not caught: %d damaged", len(r.Damaged))
+	}
+}
+
+// Rules from Winapp2 count: the sandbox exercises hundreds of them.
+func TestImportedRulesExercised(t *testing.T) {
+	if rulesInfo.Imported < 500 {
+		t.Fatalf("imported rules: %d", rulesInfo.Imported)
+	}
+	n := 0
+	for _, tg := range targets {
+		if tg.Source == "winapp2" {
+			n++
+			if tg.Risk != "safe" || len(tg.Locs) == 0 {
+				t.Errorf("%s: risk %s, %d folders", tg.ID, tg.Risk, len(tg.Locs))
+			}
+		}
+	}
+	if n != rulesInfo.Imported {
+		t.Fatalf("loaded %d of %d imported rules", n, rulesInfo.Imported)
 	}
 }

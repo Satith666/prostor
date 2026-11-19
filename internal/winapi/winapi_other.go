@@ -220,3 +220,5 @@ func FullNames(p string) string { return p }
 
 // ShortPath: no 8.3 names outside Windows.
 func ShortPath(p string) string { return "" }
+
+func RegKeyExists(Root, string) bool { return false }

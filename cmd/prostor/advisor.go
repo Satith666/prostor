@@ -216,7 +216,7 @@ func runAdvisor(j *Job, admin bool, own map[uint32]bool) (any, error) {
 		if t == nil || j.Cancelled() {
 			continue
 		}
-		it := scanTarget(t, s, j.Cancelled)
+		it := scanTarget(t, s, j.Cancelled, nil, nil)
 		if it.Size < 1*gb {
 			continue
 		}

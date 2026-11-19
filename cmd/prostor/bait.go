@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"prostor/internal/rules"
 	"prostor/internal/winapi"
 )
 
@@ -77,21 +78,24 @@ func sandboxEnv(root string) map[string]string {
 	c := filepath.Join(root, "C")
 	user := filepath.Join(c, "Users", "bait")
 	env := map[string]string{
-		"SystemDrive":       c,
-		"SystemRoot":        filepath.Join(c, "Windows"),
-		"windir":            filepath.Join(c, "Windows"),
-		"ProgramData":       filepath.Join(c, "ProgramData"),
-		"ALLUSERSPROFILE":   filepath.Join(c, "ProgramData"),
-		"ProgramFiles":      filepath.Join(c, "Program Files"),
-		"ProgramFiles(x86)": filepath.Join(c, "Program Files (x86)"),
-		"ProgramW6432":      filepath.Join(c, "Program Files"),
-		"PUBLIC":            filepath.Join(c, "Users", "Public"),
-		"USERPROFILE":       user,
-		"HOMEDRIVE":         c,
-		"APPDATA":           filepath.Join(user, "AppData", "Roaming"),
-		"LOCALAPPDATA":      filepath.Join(user, "AppData", "Local"),
-		"TEMP":              filepath.Join(user, "AppData", "Local", "Temp"),
-		"TMP":               filepath.Join(user, "AppData", "Local", "Temp"),
+		"SystemDrive":             c,
+		"SystemRoot":              filepath.Join(c, "Windows"),
+		"windir":                  filepath.Join(c, "Windows"),
+		"ProgramData":             filepath.Join(c, "ProgramData"),
+		"ALLUSERSPROFILE":         filepath.Join(c, "ProgramData"),
+		"ProgramFiles":            filepath.Join(c, "Program Files"),
+		"ProgramFiles(x86)":       filepath.Join(c, "Program Files (x86)"),
+		"ProgramW6432":            filepath.Join(c, "Program Files"),
+		"CommonProgramFiles":      filepath.Join(c, "Program Files", "Common Files"),
+		"CommonProgramFiles(x86)": filepath.Join(c, "Program Files (x86)", "Common Files"),
+		"CommonProgramW6432":      filepath.Join(c, "Program Files", "Common Files"),
+		"PUBLIC":                  filepath.Join(c, "Users", "Public"),
+		"USERPROFILE":             user,
+		"HOMEDRIVE":               c,
+		"APPDATA":                 filepath.Join(user, "AppData", "Roaming"),
+		"LOCALAPPDATA":            filepath.Join(user, "AppData", "Local"),
+		"TEMP":                    filepath.Join(user, "AppData", "Local", "Temp"),
+		"TMP":                     filepath.Join(user, "AppData", "Local", "Temp"),
 	}
 	if !winapi.IsWindows {
 		env["HOME"] = user
@@ -154,9 +158,70 @@ type planter struct {
 	rnd   *rand.Rand
 	baits []baitFile
 	junk  map[string][]string // rule -> junk files
-	roots []string            // every concrete root of every rule (lowercase)
+	roots []plantRoot         // every concrete root of every rule
 	old   time.Time
 	err   error
+}
+
+type plantRoot struct {
+	pattern string // lowercase, may hold wildcards — as the cleaner sees it
+	prefix  string // literal part before the first wildcard
+	rule    string
+	loc     *rules.Loc
+}
+
+func newPlantRoot(pattern, rule string, loc *rules.Loc) plantRoot {
+	lp := lower(filepath.Clean(pattern))
+	pre := lp
+	if i := strings.IndexAny(lp, "*?"); i >= 0 {
+		pre = lp[:i]
+	}
+	return plantRoot{pattern: lp, prefix: pre, rule: rule, loc: loc}
+}
+
+// holds: the folder dir (lowercase) is this root or, unless the root is
+// flat, inside it.
+func (r plantRoot) holds(dir string, flat bool) bool {
+	if !strings.HasPrefix(dir, r.prefix) {
+		return false
+	}
+	for d := dir; ; {
+		if ok, _ := filepath.Match(r.pattern, d); ok {
+			return true
+		}
+		if flat {
+			return false
+		}
+		up := filepath.Dir(d)
+		if up == d || len(up) < len(r.prefix)-1 {
+			return false
+		}
+		d = up
+	}
+}
+
+// covered: some rule's folder (other than the one skipped) would delete a
+// file at p, so it cannot serve as bait there.
+func (pl *planter) covered(p string, skipLoc *rules.Loc, skipRule string) bool {
+	lp := lower(filepath.Clean(p))
+	dir, name := filepath.Dir(lp), filepath.Base(lp)
+	for _, r := range pl.roots {
+		if r.loc == skipLoc || (skipRule != "" && r.rule == skipRule) {
+			continue
+		}
+		if !r.holds(dir, r.loc.Flat) {
+			continue
+		}
+		if len(r.loc.Masks) == 0 {
+			return true
+		}
+		for _, m := range r.loc.Masks {
+			if ok, _ := filepath.Match(m, name); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (pl *planter) write(path string, size int, mtime time.Time) error {
@@ -175,7 +240,7 @@ func (pl *planter) write(path string, size int, mtime time.Time) error {
 func (pl *planter) underAnyRoot(p string) bool {
 	lp := lower(filepath.Clean(p))
 	for _, r := range pl.roots {
-		if lp == r || strings.HasPrefix(lp, r+string(filepath.Separator)) {
+		if r.holds(lp, false) || r.holds(filepath.Dir(lp), false) {
 			return true
 		}
 	}
@@ -202,10 +267,19 @@ func (pl *planter) bait(path, why string, age time.Duration) {
 
 // force plants a precious file wherever it is: if some rule's folder covers
 // it, that rule is exactly what the test must catch.
-func (pl *planter) force(path, why string, age time.Duration) { pl.inner(path, why, age) }
+func (pl *planter) force(path, why string, age time.Duration) { pl.plant(path, why, age) }
 
-// bait inside a rule's own folder: the rule's filters must protect it.
-func (pl *planter) inner(path, why string, age time.Duration) {
+// inner: bait inside a rule's own folder that the rule's filters must
+// protect; skipped where another folder (not skipLoc, not of skipRule) would
+// rightly delete it.
+func (pl *planter) inner(path, why string, age time.Duration, skipLoc *rules.Loc, skipRule string) {
+	if pl.covered(path, skipLoc, skipRule) {
+		return
+	}
+	pl.plant(path, why, age)
+}
+
+func (pl *planter) plant(path, why string, age time.Duration) {
 	if _, err := os.Lstat(path); err == nil {
 		return // two patterns of a rule can name the same folder
 	}
@@ -226,56 +300,89 @@ func (pl *planter) addJunk(id, path string) {
 	}
 }
 
-func (pl *planter) plantRule(t *Target, docs string) {
-	for _, pat := range t.Paths {
-		for _, r := range concrete(pat) {
+// keepName picks a bait name that none of the masks matches.
+func keepName(masks []string) string {
+	for _, n := range []string{"prostor-bait-keep.dll", "prostor-bait-keep.sys", "prostor-bait-keep.ini", "prostor-bait-keep"} {
+		hit := false
+		for _, m := range masks {
+			if ok, _ := filepath.Match(m, n); ok {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			return n
+		}
+	}
+	return ""
+}
+
+func (pl *planter) plantRule(t *Target, docs string, links bool) {
+	month := 40 * 24 * time.Hour
+	for li := range t.Locs {
+		loc := &t.Locs[li]
+		masks := loc.Masks
+		for _, r := range concrete(loc.Path) {
 			if isFileRoot(r) {
 				pl.addJunk(t.ID, r)
 				continue
 			}
 			// junk the rule must remove
-			if len(t.Masks) > 0 {
-				for i, m := range t.Masks {
+			if len(masks) > 0 {
+				for i, m := range masks {
 					pl.addJunk(t.ID, filepath.Join(r, maskName(m, i)))
 				}
 			} else {
 				pl.addJunk(t.ID, filepath.Join(r, "junk.tmp"))
 				pl.addJunk(t.ID, filepath.Join(r, "data_1"))
 			}
-			if !t.Flat {
+			if !loc.Flat {
 				name := "deep.bin"
-				if len(t.Masks) > 0 {
-					name = maskName(t.Masks[0], 9)
+				if len(masks) > 0 {
+					name = maskName(masks[0], 9)
 				}
 				pl.addJunk(t.ID, filepath.Join(r, "sub", "inner", name))
 			}
 			// next to the folder: what lives beside a cache (bookmarks, settings)
-			pl.bait(filepath.Join(filepath.Dir(r), "prostor-bait-beside-"+t.ID+".dat"), "рядом с папкой правила «"+t.Name+"»", 40*24*time.Hour)
+			pl.bait(filepath.Join(filepath.Dir(r), "prostor-bait-beside-"+t.ID+".dat"), "рядом с папкой правила «"+t.Name+"»", month)
 			// inside the folder, protected by the rule's own filters
-			if len(t.Masks) > 0 {
-				pl.inner(filepath.Join(r, "prostor-bait-keep.dll"), "не подходит под маску правила «"+t.Name+"»", 40*24*time.Hour)
+			if len(masks) > 0 {
+				if n := keepName(masks); n != "" {
+					pl.inner(filepath.Join(r, n), "не подходит под маску правила «"+t.Name+"»", month, loc, "")
+				}
 			}
 			if t.MinAge > 0 || t.Recent {
 				name := "prostor-bait-fresh.tmp"
-				if len(t.Masks) > 0 {
-					name = maskName(t.Masks[0], 7)
+				if len(masks) > 0 {
+					name = maskName(masks[0], 7)
 				}
-				pl.inner(filepath.Join(r, name), "свежий файл, правило «"+t.Name+"» должно его пропустить", time.Hour)
+				pl.inner(filepath.Join(r, name), "свежий файл, правило «"+t.Name+"» должно его пропустить", time.Hour, nil, t.ID)
 			}
-			if t.Flat {
+			if loc.Flat {
 				name := "prostor-bait-nested.dat"
-				if len(t.Masks) > 0 {
-					name = maskName(t.Masks[0], 8)
+				if len(masks) > 0 {
+					name = maskName(masks[0], 8)
 				}
-				pl.inner(filepath.Join(r, "Nested", name), "во вложенной папке, правило «"+t.Name+"» в неё не заходит", 40*24*time.Hour)
+				pl.inner(filepath.Join(r, "Nested", name), "во вложенной папке, правило «"+t.Name+"» в неё не заходит", month, loc, "")
 			}
 			// a link from the cache to documents: the documents must survive
 			link := filepath.Join(r, "prostor-bait-link")
-			if _, err := os.Lstat(link); os.IsNotExist(err) && docs != "" {
+			if _, err := os.Lstat(link); os.IsNotExist(err) && docs != "" && links {
 				if makeLink(link, docs) != nil && pl.err == nil && winapi.IsWindows {
 					pl.err = fmt.Errorf("не удалось создать ссылку %s", link)
 				}
 			}
+			links = links && t.Source == "" // imported rules: one link per rule is enough
+		}
+	}
+	// files the rule itself promises to keep
+	for _, x := range t.Excludes {
+		for _, d := range concrete(x.Path) {
+			name := "prostor-bait-excluded.dat"
+			if len(x.Masks) > 0 {
+				name = maskName(x.Masks[0], 5)
+			}
+			pl.inner(filepath.Join(d, name), "исключение правила «"+t.Name+"»", month, nil, t.ID)
 		}
 	}
 }
@@ -432,9 +539,9 @@ func baitTest(live bool) *BaitReport {
 			continue
 		}
 		ids = append(ids, t.ID)
-		for _, pat := range t.Paths {
-			for _, r := range concrete(pat) {
-				pl.roots = append(pl.roots, lower(filepath.Clean(r)))
+		for li := range t.Locs {
+			if p := expandPath(t.Locs[li].Path); p != "" {
+				pl.roots = append(pl.roots, newPlantRoot(p, t.ID, &t.Locs[li]))
 			}
 		}
 	}
@@ -443,9 +550,16 @@ func baitTest(live bool) *BaitReport {
 	docs := filepath.Join(os.Getenv("USERPROFILE"), "Documents", "prostor-bait-linked")
 	pl.bait(filepath.Join(docs, "prostor-bait за ссылкой.docx"), "документ, на который указывает ссылка из кэша", 300*24*time.Hour)
 	pl.plantPrecious()
+	imported := 0
 	for _, id := range ids {
 		if t := targetByID(id); t != nil && t.Special != "recycle" {
-			pl.plantRule(t, docs)
+			links := t.Source == ""
+			if !links {
+				// links come from the walker, not the rule: a sample of imported rules is enough
+				links = imported%25 == 0
+				imported++
+			}
+			pl.plantRule(t, docs, links)
 		}
 	}
 	if live {

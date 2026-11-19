@@ -6,12 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"prostor/internal/rules"
 	"prostor/internal/winapi"
 )
 
@@ -131,70 +133,90 @@ type root struct {
 	path   string
 	isFile bool
 	info   fs.FileInfo
+	loc    *rules.Loc
 }
 
-func resolveRoots(t *Target) []root {
-	seen := map[string]bool{}
-	var out []root
-	var all []string
-	for _, pat := range t.Paths {
-		p := expandPath(pat)
+// covers: this root deletes everything below it (every file, every depth).
+func (r root) covers() bool { return !r.isFile && !r.loc.Flat && len(r.loc.Masks) == 0 }
+
+func resolveRoots(t *Target, dc *dirCache) []root {
+	if dc == nil {
+		dc = newDirCache()
+	}
+	type cand struct {
+		path string
+		loc  *rules.Loc
+	}
+	var all []cand
+	wild := map[*rules.Loc]bool{}
+	for i := range t.Locs {
+		l := &t.Locs[i]
+		p := expandPath(l.Path)
 		if p == "" {
 			continue
 		}
-		if strings.ContainsAny(p, "*?") {
-			m, _ := filepath.Glob(p)
-			all = append(all, m...)
-		} else {
-			all = append(all, p)
+		wild[l] = strings.ContainsAny(p, "*?")
+		for _, m := range dc.glob(p) {
+			all = append(all, cand{m, l})
 		}
 	}
 	// shortest first, so a parent folder always wins over its own subfolders
 	// (e.g. %LOCALAPPDATA%\Temp vs a %TEMP% that points to Temp\2)
-	sort.SliceStable(all, func(a, b int) bool { return len(all[a]) < len(all[b]) })
-	{
-		matches := all
-		for _, m := range matches {
-			key := lower(m)
-			if seen[key] || !safeRoot(m) {
-				continue
-			}
-			fi, err := os.Lstat(m)
-			if err != nil || fi.Mode()&os.ModeSymlink != 0 || winapi.FileAttributes(fi)&attrReparse != 0 {
-				continue
-			}
-			// skip roots nested inside an already selected root
-			nested := false
-			for _, r := range out {
-				if !r.isFile && strings.HasPrefix(key, lower(r.path)+string(filepath.Separator)) {
-					nested = true
-					break
-				}
-			}
-			if nested {
-				continue
-			}
-			seen[key] = true
-			out = append(out, root{path: m, isFile: !fi.IsDir(), info: fi})
+	sort.SliceStable(all, func(a, b int) bool { return len(all[a].path) < len(all[b].path) })
+	seen := map[string]bool{}
+	var out []root
+	for _, c := range all {
+		key := lower(c.path) + "|" + strings.Join(c.loc.Masks, ";") + fmt.Sprint(c.loc.Flat)
+		if seen[key] || !safeRoot(c.path) {
+			continue
 		}
+		fi, err := os.Lstat(c.path)
+		if err != nil || fi.Mode()&os.ModeSymlink != 0 || winapi.FileAttributes(fi)&attrReparse != 0 {
+			continue
+		}
+		// a wildcard names folders ("User Data\*\Cache*"), never files that
+		// happen to match it; files are chosen by masks inside the folder
+		if wild[c.loc] && !fi.IsDir() {
+			continue
+		}
+		// skip roots inside an already selected root that deletes everything
+		lk := lower(c.path)
+		nested := false
+		for _, r := range out {
+			if r.covers() && strings.HasPrefix(lk, lower(r.path)+string(filepath.Separator)) {
+				nested = true
+				break
+			}
+		}
+		if nested {
+			continue
+		}
+		seen[key] = true
+		out = append(out, root{path: c.path, isFile: !fi.IsDir(), info: fi, loc: c.loc})
 	}
 	return out
 }
-
-// ---------------------------------------------------------------- walking
 
 type walkOpts struct {
 	masks       []string
 	olderThan   time.Time // zero = no limit
 	flat        bool
-	excludes    []string
+	excludes    []string   // the user's excluded folders
+	keep        []keepRule // the rule's own exclusions
 	removeLinks bool
 	cancel      func() bool
 	touched     map[string]bool // folders we emptied ourselves (their mtime is now fresh)
 }
 
-func newWalkOpts(t *Target, s Settings, cancel func() bool) *walkOpts {
-	o := &walkOpts{masks: t.Masks, flat: t.Flat, cancel: cancel, removeLinks: t.Special == "takeown"}
+// keepRule: files the rule itself leaves alone (Winapp2 ExcludeKey).
+type keepRule struct {
+	dir     string // lowercase
+	masks   []string
+	recurse bool
+}
+
+func newWalkOpts(t *Target, s Settings, cancel func() bool, dc *dirCache) *walkOpts {
+	o := &walkOpts{cancel: cancel, removeLinks: t.Special == "takeown"}
 	now := time.Now()
 	if t.MinAge > 0 {
 		o.olderThan = now.Add(-time.Duration(t.MinAge) * 24 * time.Hour)
@@ -211,7 +233,53 @@ func newWalkOpts(t *Target, s Settings, cancel func() bool) *walkOpts {
 			o.excludes = append(o.excludes, lower(filepath.Clean(winapi.FullNames(winapi.ExpandEnv(e)))))
 		}
 	}
+	if len(t.Excludes) > 0 {
+		if dc == nil {
+			dc = newDirCache()
+		}
+		for _, x := range t.Excludes {
+			p := expandPath(x.Path)
+			if p == "" {
+				continue
+			}
+			for _, d := range dc.glob(p) {
+				o.keep = append(o.keep, keepRule{dir: lower(filepath.Clean(d)), masks: x.Masks, recurse: x.Recurse})
+			}
+		}
+	}
 	return o
+}
+
+// at returns the options for one root: its own masks and depth.
+func (o *walkOpts) at(r root) *walkOpts {
+	c := *o
+	c.masks, c.flat = r.loc.Masks, r.loc.Flat
+	return &c
+}
+
+// testIgnoreKeep (tests only) breaks rule exclusions to prove the bait test notices.
+var testIgnoreKeep bool
+
+func (o *walkOpts) kept(path, name string) bool {
+	if len(o.keep) == 0 || testIgnoreKeep {
+		return false
+	}
+	dir := lower(filepath.Dir(path))
+	ln := lower(name)
+	for _, k := range o.keep {
+		if dir != k.dir && !(k.recurse && strings.HasPrefix(dir, k.dir+string(filepath.Separator))) {
+			continue
+		}
+		if len(k.masks) == 0 {
+			return true
+		}
+		for _, m := range k.masks {
+			if ok, _ := filepath.Match(m, ln); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (o *walkOpts) excluded(path string) bool {
@@ -278,7 +346,7 @@ func (o *walkOpts) walk(dir string, fn func(path string, fi fs.FileInfo), link f
 			}
 			continue
 		}
-		if o.matches(e.Name(), fi) {
+		if o.matches(e.Name(), fi) && !o.kept(p, e.Name()) {
 			fn(p, fi)
 		}
 	}
@@ -314,29 +382,57 @@ func runningProcs(own map[uint32]bool) map[string]bool {
 	return out
 }
 
-func scanTarget(t *Target, s Settings, cancel func() bool) ScanItem {
+// claimSet makes every file count once in a scan, even when several rules
+// (often a Prostor rule and an imported one) reach the same folder.
+type claimSet struct{ m sync.Map }
+
+func (c *claimSet) first(p string) bool {
+	if c == nil {
+		return true
+	}
+	_, dup := c.m.LoadOrStore(lower(p), struct{}{})
+	return !dup
+}
+
+func scanTarget(t *Target, s Settings, cancel func() bool, dc *dirCache, claims *claimSet) ScanItem {
 	it := ScanItem{ID: t.ID}
 	if t.Special == "recycle" {
 		b, n := winapi.RecycleBin()
 		it.Size, it.Files, it.Found = b, n, true
 		return it
 	}
-	o := newWalkOpts(t, s, cancel)
-	for _, r := range resolveRoots(t) {
+	if !t.detected(dc) {
+		return it
+	}
+	o := newWalkOpts(t, s, cancel, dc)
+	for _, r := range resolveRoots(t, dc) {
 		it.Found = true
 		if r.isFile {
-			if o.matches(r.info.Name(), r.info) {
+			if o.at(r).matches(r.info.Name(), r.info) && claims.first(r.path) {
 				it.Size += r.info.Size()
 				it.Files++
 			}
 			continue
 		}
-		o.walk(r.path, func(_ string, fi fs.FileInfo) {
-			it.Size += fi.Size()
-			it.Files++
+		o.at(r).walk(r.path, func(p string, fi fs.FileInfo) {
+			if claims.first(p) {
+				it.Size += fi.Size()
+				it.Files++
+			}
 		}, nil)
 	}
 	return it
+}
+
+func scanWorkers() int {
+	n := runtime.NumCPU() * 2
+	if n < 4 {
+		n = 4
+	}
+	if n > 16 {
+		n = 16
+	}
+	return n
 }
 
 func scanTargets(j *Job, ids []string, s Settings, own map[uint32]bool) []ScanItem {
@@ -349,32 +445,41 @@ func scanTargets(j *Job, ids []string, s Settings, own map[uint32]bool) []ScanIt
 	j.Total.Store(int64(len(list)))
 	running := runningProcs(own)
 	res := make([]ScanItem, len(list))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4)
-	for i, t := range list {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(i int, t *Target) {
-			defer func() { <-sem; wg.Done() }()
-			defer winapi.BackgroundThread()()
-			if j.Cancelled() {
-				res[i] = ScanItem{ID: t.ID}
-				return
+	dc := newDirCache()
+	claims := &claimSet{}
+	// Prostor's own rules first: when an imported rule reaches the same
+	// files, they stay with the rule the user knows.
+	for _, imported := range []bool{false, true} {
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, scanWorkers())
+		for i, t := range list {
+			if (t.Source != "") != imported {
+				continue
 			}
-			j.SetCurrent(t.Name)
-			it := scanTarget(t, s, j.Cancelled)
-			for _, p := range t.Procs {
-				if running[p] {
-					it.Running = append(it.Running, p)
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(i int, t *Target) {
+				defer func() { <-sem; wg.Done() }()
+				defer winapi.BackgroundThread()()
+				if j.Cancelled() {
+					res[i] = ScanItem{ID: t.ID}
+					return
 				}
-			}
-			res[i] = it
-			j.Bytes.Add(it.Size)
-			j.Files.Add(it.Files)
-			j.Done.Add(1)
-		}(i, t)
+				j.SetCurrent(t.Name)
+				it := scanTarget(t, s, j.Cancelled, dc, claims)
+				for _, p := range t.Procs {
+					if running[p] {
+						it.Running = append(it.Running, p)
+					}
+				}
+				res[i] = it
+				j.Bytes.Add(it.Size)
+				j.Files.Add(it.Files)
+				j.Done.Add(1)
+			}(i, t)
+		}
+		wg.Wait()
 	}
-	wg.Wait()
 	if !j.Cancelled() {
 		rememberScan(res)
 	}
@@ -541,7 +646,8 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 			}
 		}()
 	}
-	o := newWalkOpts(t, s, j.Cancelled)
+	dc := newDirCache()
+	o := newWalkOpts(t, s, j.Cancelled, dc)
 	o.touched = map[string]bool{}
 	onFail := func(p string, size int64) {
 		ci.Failed++
@@ -554,13 +660,13 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 		}
 		jr.add("f", p, size, t.ID)
 	}
-	for _, r := range resolveRoots(t) {
+	for _, r := range resolveRoots(t, dc) {
 		if j.Cancelled() {
 			break
 		}
 		j.SetCurrent(r.path)
 		if r.isFile {
-			if o.matches(r.info.Name(), r.info) {
+			if o.at(r).matches(r.info.Name(), r.info) && !o.kept(r.path, r.info.Name()) {
 				if removeFile(r.path) == nil {
 					ci.Freed += r.info.Size()
 					ci.Files++
@@ -579,7 +685,8 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 		if o.removeLinks {
 			linkFn = func(p string) { os.Remove(p) } // removes the link itself, never its target
 		}
-		o.walk(r.path, func(p string, fi fs.FileInfo) {
+		ro := o.at(r)
+		ro.walk(r.path, func(p string, fi fs.FileInfo) {
 			if removeFile(p) == nil {
 				o.touched[lower(filepath.Dir(p))] = true
 				ci.Freed += fi.Size()
@@ -591,8 +698,8 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 				onFail(p, fi.Size())
 			}
 		}, linkFn)
-		if !t.KeepDirs && !t.Flat {
-			removeEmptyDirs(r.path, true, o)
+		if !r.loc.KeepDirs && !r.loc.Flat {
+			removeEmptyDirs(r.path, true, ro)
 		}
 		if t.Special == "takeown" {
 			os.Remove(r.path) // the leftover folder itself
@@ -644,7 +751,7 @@ func cleanTargets(j *Job, ids []string, s Settings, admin bool, mode string) Cle
 // selectedIDs returns the targets the user has ticked (or the defaults).
 func selectedIDs(s Settings, admin bool, safeOnly bool) []string {
 	var ids []string
-	for _, t := range targets {
+	for _, t := range offered(newDirCache()) {
 		on := t.Default
 		if v, ok := s.Selected[t.ID]; ok {
 			on = v
