@@ -42,7 +42,7 @@ public static class DemoLatency
         new("Realtek High Definition Audio", "MEDIA", @"PCI\VEN_8086&DEV_A3F0", true, null),
         new("Intel(R) Wi-Fi 6 AX200 160MHz", "Net", @"PCI\VEN_8086&DEV_2723", true, 16),
         new("Realtek PCIe GbE Family Controller", "Net", @"PCI\VEN_10EC&DEV_8168", true, 1),
-        new("Стандартный контроллер NVM Express", "SCSIAdapter", @"PCI\VEN_144D&DEV_A808", true, null),
-        new("Расширяемый хост-контроллер Intel(R) USB 3.1", "USB", @"PCI\VEN_8086&DEV_A3AF", true, 8),
+        new(Lang.T("Стандартный контроллер NVM Express", "Standard NVM Express Controller"), "SCSIAdapter", @"PCI\VEN_144D&DEV_A808", true, null),
+        new(Lang.T("Расширяемый хост-контроллер Intel(R) USB 3.1", "Intel(R) USB 3.1 eXtensible Host Controller"), "USB", @"PCI\VEN_8086&DEV_A3AF", true, 8),
     ];
 }

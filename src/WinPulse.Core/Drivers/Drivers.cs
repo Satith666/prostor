@@ -33,10 +33,10 @@ public sealed class DriverRow
     public string? LinkLabel { get; init; }
     public bool IsInbox { get; init; }
 
-    public string AgeText => AgeDays is not int d ? "дата неизвестна"
-        : d < 31 ? "меньше месяца"
-        : d < 365 ? $"{d / 30} мес."
-        : $"{d / 365} г. {d % 365 / 30} мес.";
+    public string AgeText => AgeDays is not int d ? Lang.T("дата неизвестна", "date unknown")
+        : d < 31 ? Lang.T("меньше месяца", "under a month")
+        : d < 365 ? Lang.T($"{d / 30} мес.", $"{d / 30} mo")
+        : Lang.T($"{d / 365} г. {d % 365 / 30} мес.", $"{d / 365} y {d % 365 / 30} mo");
 }
 
 public static class DriverAnalysis
@@ -81,14 +81,14 @@ public static class DriverAnalysis
 
     public static string CategoryText(DriverCategory c) => c switch
     {
-        DriverCategory.Graphics => "Видеокарта",
-        DriverCategory.Network => "Сеть",
-        DriverCategory.Audio => "Звук",
-        DriverCategory.Storage => "Диски и контроллеры",
-        DriverCategory.Chipset => "Чипсет",
+        DriverCategory.Graphics => Lang.T("Видеокарта", "Graphics"),
+        DriverCategory.Network => Lang.T("Сеть", "Network"),
+        DriverCategory.Audio => Lang.T("Звук", "Audio"),
+        DriverCategory.Storage => Lang.T("Диски и контроллеры", "Disks and controllers"),
+        DriverCategory.Chipset => Lang.T("Чипсет", "Chipset"),
         DriverCategory.Bluetooth => "Bluetooth",
-        DriverCategory.Camera => "Камера",
-        _ => "Другое",
+        DriverCategory.Camera => Lang.T("Камера", "Camera"),
+        _ => Lang.T("Другое", "Other"),
     };
 
     /// <summary>Производитель оборудования по идентификатору устройства (VEN_/VID_), иначе по поставщику драйвера.</summary>
@@ -159,53 +159,53 @@ public static class DriverAnalysis
             {
                 (link, linkLabel) = vendor switch
                 {
-                    "NVIDIA" => (NvidiaUrl, "Драйверы NVIDIA"),
-                    "AMD" => (AmdUrl, "Драйверы AMD"),
-                    "Intel" => (IntelUrl, "Помощник Intel"),
-                    _ => (OptionalUpdates, "Обновления Windows"),
+                    "NVIDIA" => (NvidiaUrl, Lang.T("Драйверы NVIDIA", "NVIDIA drivers")),
+                    "AMD" => (AmdUrl, Lang.T("Драйверы AMD", "AMD drivers")),
+                    "Intel" => (IntelUrl, Lang.T("Помощник Intel", "Intel assistant")),
+                    _ => (OptionalUpdates, Lang.T("Обновления Windows", "Windows updates")),
                 };
                 if (d.DeviceName.Contains("Basic Display", StringComparison.OrdinalIgnoreCase) || d.DeviceName.Contains("Базовый видеоадаптер", StringComparison.OrdinalIgnoreCase))
                 {
                     severity = Severity.Critical;
-                    advice = "Драйвер видеокарты не установлен — работает «Базовый видеоадаптер». Игры будут работать медленно или не запустятся. Установите драйвер с сайта производителя видеокарты.";
+                    advice = Lang.T("Драйвер видеокарты не установлен — работает «Базовый видеоадаптер». Игры будут работать медленно или не запустятся. Установите драйвер с сайта производителя видеокарты.", "The graphics driver isn't installed — Microsoft Basic Display Adapter is in use. Games will run slowly or not start. Install the driver from the GPU maker's website.");
                 }
                 else if (age is int a && a > 365)
                 {
                     severity = Severity.Warning;
-                    advice = "Драйверу видеокарты больше года. Новые игры часто требуют свежий драйвер — проверьте обновление на сайте производителя.";
+                    advice = Lang.T("Драйверу видеокарты больше года. Новые игры часто требуют свежий драйвер — проверьте обновление на сайте производителя.", "The graphics driver is over a year old. New games often need a fresh driver — check for an update on the maker's website.");
                 }
                 else if (age is int b && b > 120)
                 {
                     severity = Severity.Info;
-                    advice = "Драйверу больше четырёх месяцев — есть смысл проверить, не вышел ли новый.";
+                    advice = Lang.T("Драйверу больше четырёх месяцев — есть смысл проверить, не вышел ли новый.", "The driver is over four months old — worth checking whether a new one is out.");
                 }
                 else
                 {
-                    advice = "Драйвер свежий. Обновлять стоит, если вышла новая игра или драйвер исправляет вашу проблему.";
+                    advice = Lang.T("Драйвер свежий. Обновлять стоит, если вышла новая игра или драйвер исправляет вашу проблему.", "The driver is fresh. Update if a new game is out or a driver fixes your problem.");
                 }
             }
             else
             {
                 link = OptionalUpdates;
-                linkLabel = "Обновления Windows";
-                if (category == DriverCategory.Chipset && vendor == "AMD") (link, linkLabel) = (AmdUrl, "Драйверы чипсета AMD");
-                if (category == DriverCategory.Chipset && vendor == "Intel") (link, linkLabel) = (IntelUrl, "Помощник Intel");
+                linkLabel = Lang.T("Обновления Windows", "Windows updates");
+                if (category == DriverCategory.Chipset && vendor == "AMD") (link, linkLabel) = (AmdUrl, Lang.T("Драйверы чипсета AMD", "AMD chipset drivers"));
+                if (category == DriverCategory.Chipset && vendor == "Intel") (link, linkLabel) = (IntelUrl, Lang.T("Помощник Intel", "Intel assistant"));
 
                 if (inbox)
-                    advice = "Стандартный драйвер Windows — обновляется через Центр обновления.";
+                    advice = Lang.T("Стандартный драйвер Windows — обновляется через Центр обновления.", "Built-in Windows driver — updated through Windows Update.");
                 else if (age is int a && a > 3 * 365)
                 {
                     severity = Severity.Info;
-                    advice = "Драйверу больше трёх лет. Если устройство работает без сбоев — можно не трогать; при проблемах возьмите новый на сайте производителя материнской платы или ноутбука.";
+                    advice = Lang.T("Драйверу больше трёх лет. Если устройство работает без сбоев — можно не трогать; при проблемах возьмите новый на сайте производителя материнской платы или ноутбука.", "The driver is over three years old. If the device works fine, leave it; if there are problems, get a new one from the motherboard or laptop maker's website.");
                 }
                 else
-                    advice = "В порядке. Обновлять стоит только при проблемах с устройством.";
+                    advice = Lang.T("В порядке. Обновлять стоит только при проблемах с устройством.", "Fine. Update only if the device has problems.");
             }
 
             if (d.ProblemCode != 0 && d.ProblemCode != 22)
             {
                 severity = Severity.Warning > severity ? Severity.Warning : severity;
-                advice = $"Устройство работает с ошибкой: {DeviceProblemCodes.Describe(d.ProblemCode)} (код {d.ProblemCode}). " + advice;
+                advice = Lang.T($"Устройство работает с ошибкой: {DeviceProblemCodes.Describe(d.ProblemCode)} (код {d.ProblemCode}). ", $"The device has an error: {DeviceProblemCodes.Describe(d.ProblemCode)} (code {d.ProblemCode}). ") + advice;
             }
 
             rows.Add(new DriverRow
@@ -232,15 +232,17 @@ public static class DriverAnalysis
     /// <summary>Чистая переустановка видеодрайвера — по шагам.</summary>
     public static IReadOnlyList<string> CleanInstallSteps(string vendor) => new[]
     {
-        "Скачайте новый драйвер заранее — с сайта " + (vendor is "NVIDIA" or "AMD" or "Intel" ? vendor : "производителя видеокарты") + ".",
-        "Отключите интернет, чтобы Windows не поставила свой драйвер посреди процесса.",
+        vendor is "NVIDIA" or "AMD" or "Intel"
+            ? Lang.T($"Скачайте новый драйвер заранее — с сайта {vendor}.", $"Download the new driver in advance from the {vendor} website.")
+            : Lang.T("Скачайте новый драйвер заранее — с сайта производителя видеокарты.", "Download the new driver in advance from the GPU maker's website."),
+        Lang.T("Отключите интернет, чтобы Windows не поставила свой драйвер посреди процесса.", "Disconnect from the internet so Windows doesn't install its own driver midway."),
         vendor switch
         {
-            "NVIDIA" => "Запустите установщик NVIDIA → «Выборочная установка» → отметьте «Выполнить чистую установку».",
-            "AMD" => "В установщике AMD Software выберите «Сброс к заводским настройкам» (Factory Reset).",
-            _ => "Удалите старый драйвер в «Приложения и возможности», перезагрузитесь и установите новый.",
+            "NVIDIA" => Lang.T("Запустите установщик NVIDIA → «Выборочная установка» → отметьте «Выполнить чистую установку».", "Run the NVIDIA installer → Custom install → check Perform a clean installation."),
+            "AMD" => Lang.T("В установщике AMD Software выберите «Сброс к заводским настройкам» (Factory Reset).", "In the AMD Software installer choose Factory Reset."),
+            _ => Lang.T("Удалите старый драйвер в «Приложения и возможности», перезагрузитесь и установите новый.", "Uninstall the old driver in Apps & features, restart and install the new one."),
         },
-        "Если проблемы остаются — удалите драйвер утилитой Display Driver Uninstaller (DDU) в безопасном режиме и установите заново.",
-        "Перезагрузите компьютер и снова подключите интернет.",
+        Lang.T("Если проблемы остаются — удалите драйвер утилитой Display Driver Uninstaller (DDU) в безопасном режиме и установите заново.", "If problems remain, remove the driver with Display Driver Uninstaller (DDU) in Safe Mode and install it again."),
+        Lang.T("Перезагрузите компьютер и снова подключите интернет.", "Restart the PC and reconnect to the internet."),
     };
 }

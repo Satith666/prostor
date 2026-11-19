@@ -144,7 +144,7 @@ public static class DiskHealthReader
         {
             if (e.ValueKind != JsonValueKind.Object) continue;
             list.Add(new DiskHealthInfo(
-                Str(e, "Name") ?? "Диск",
+                Str(e, "Name") ?? Lang.T("Диск", "Disk"),
                 MediaName(Str(e, "Media")),
                 BusName(Str(e, "Bus")),
                 Str(e, "Health") ?? "",
@@ -208,13 +208,13 @@ public static class SystemChecks
         {
             using var lm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
             using (var k = lm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"))
-                if (k is not null) reasons.Add("Установка компонентов Windows ждёт перезагрузки");
+                if (k is not null) reasons.Add(Lang.T("Установка компонентов Windows ждёт перезагрузки", "Windows component installation is waiting for a restart"));
             using (var k = lm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
-                if (k is not null) reasons.Add("Обновления Windows ждут перезагрузки");
+                if (k is not null) reasons.Add(Lang.T("Обновления Windows ждут перезагрузки", "Windows updates are waiting for a restart"));
             using (var k = lm.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager"))
             {
                 if (k?.GetValue("PendingFileRenameOperations") is string[] ops && ops.Any(o => o.Length > 0))
-                    reasons.Add("Программы ждут перезагрузки, чтобы заменить свои файлы");
+                    reasons.Add(Lang.T("Программы ждут перезагрузки, чтобы заменить свои файлы", "Programs are waiting for a restart to replace their files"));
             }
         }
         catch (Exception ex)

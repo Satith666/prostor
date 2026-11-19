@@ -81,7 +81,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Error("source", ex);
-            MessageBox.Show("Не удалось подключиться к счётчикам Windows, запускаю демо-режим.\n\n" + ex.Message,
+            MessageBox.Show(Lang.T("Не удалось подключиться к счётчикам Windows, запускаю демо-режим.\n\n", "Couldn't connect to Windows performance counters, starting demo mode.\n\n") + ex.Message,
                 "WinPulse", MessageBoxButton.OK, MessageBoxImage.Warning);
             source = new DemoSystemSource();
         }
@@ -268,8 +268,8 @@ public partial class App : Application
         _lastErrorMessage = message;
         _lastErrorShown = DateTime.UtcNow;
         MessageBox.Show(
-            "Произошла ошибка. Она записана в журнал, программа продолжит работу.\n\n" + e.Exception.Message +
-            "\n\nЖурнал: " + Log.FilePath,
+            Lang.T("Произошла ошибка. Она записана в журнал, программа продолжит работу.\n\n", "An error occurred. It was written to the log; the app will keep running.\n\n") + e.Exception.Message +
+            Lang.T("\n\nЖурнал: ", "\n\nLog: ") + Log.FilePath,
             "WinPulse", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }

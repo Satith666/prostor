@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Win32;
 using WinPulse.Core.Tweaks;
 using WinPulse.Optimizer.Changes;
+using WinPulse.Core;
 
 namespace WinPulse.Optimizer.Platform;
 
@@ -53,7 +54,7 @@ public static class Reg
         using var root = Base(c.Hive);
         if (c.SubKey is not null)
         {
-            using var k = root.CreateSubKey(c.Key, writable: true) ?? throw new IOException("Не удалось открыть раздел " + c.Key);
+            using var k = root.CreateSubKey(c.Key, writable: true) ?? throw new IOException(Lang.T("Не удалось открыть раздел ", "Couldn't open key ") + c.Key);
             string? current = k.GetValue(c.ValueName) as string;
             string updated = c.Kind == ChangeKind.RegistryDelete || c.Data is null
                 ? KeyValueSettings.Remove(current, c.SubKey)
@@ -76,7 +77,7 @@ public static class Reg
             return;
         }
 
-        using (var k = root.CreateSubKey(c.Key, writable: true) ?? throw new IOException("Не удалось открыть раздел " + c.Key))
+        using (var k = root.CreateSubKey(c.Key, writable: true) ?? throw new IOException(Lang.T("Не удалось открыть раздел ", "Couldn't open key ") + c.Key))
         {
             var kind = Enum.TryParse<RegistryValueKind>(c.ValueKind, out var parsed) ? parsed : RegistryValueKind.String;
             k.SetValue(c.ValueName, Deserialize(kind, c.Data ?? ""), kind);

@@ -100,7 +100,7 @@ public sealed class DemoSystemSource : ISystemSource
 
     private void Service(string name, string display, double cpu = 0.05, double memoryMb = 15)
     {
-        var p = Add("svchost.exe", @"C:\Windows\System32\svchost.exe", "Хост-процесс для служб Windows", "Microsoft Corporation",
+        var p = Add("svchost.exe", @"C:\Windows\System32\svchost.exe", Lang.T("Хост-процесс для служб Windows", "Host Process for Windows Services"), "Microsoft Corporation",
             cpu: cpu, memoryMb: memoryMb, parent: ServicesPid, threads: 8, handles: 250);
         _services[p.Pid] = new[] { new ServiceEntry(name, display) };
     }
@@ -121,18 +121,18 @@ public sealed class DemoSystemSource : ISystemSource
         Add("services.exe", sys32 + "services.exe", null, ms, memoryMb: 6, threads: 9, handles: 900);
         Add("lsass.exe", sys32 + "lsass.exe", null, ms, cpu: 0.1, memoryMb: 9, threads: 10, handles: 1500);
 
-        Service("wuauserv", "Центр обновления Windows", memoryMb: 38);
-        Service("Dnscache", "DNS-клиент", memoryMb: 9);
+        Service("wuauserv", Lang.T("Центр обновления Windows", "Windows Update"), memoryMb: 38);
+        Service("Dnscache", Lang.T("DNS-клиент", "DNS Client"), memoryMb: 9);
         Service("AudioSrv", "Windows Audio", cpu: 0.3, memoryMb: 12);
-        Service("BITS", "Фоновая интеллектуальная служба передачи (BITS)", memoryMb: 7);
+        Service("BITS", Lang.T("Фоновая интеллектуальная служба передачи (BITS)", "Background Intelligent Transfer Service"), memoryMb: 7);
         Service("SysMain", "SysMain", cpu: 0.2, memoryMb: 70);
-        Service("CDPUserSvc", "Служба платформы подключённых устройств", memoryMb: 14);
+        Service("CDPUserSvc", Lang.T("Служба платформы подключённых устройств", "Connected Devices Platform Service"), memoryMb: 14);
 
-        Add("dwm.exe", sys32 + "dwm.exe", "Диспетчер окон рабочего стола", ms, cpu: 1.4, cpuWave: 0.5, memoryMb: 140, gpu: 3, gpuMemMb: 260, threads: 22, handles: 1900);
-        var explorer = Add("explorer.exe", @"C:\Windows\explorer.exe", "Проводник", ms, cpu: 0.3, cpuWave: 0.2, memoryMb: 150, threads: 90, handles: 3600);
+        Add("dwm.exe", sys32 + "dwm.exe", Lang.T("Диспетчер окон рабочего стола", "Desktop Window Manager"), ms, cpu: 1.4, cpuWave: 0.5, memoryMb: 140, gpu: 3, gpuMemMb: 260, threads: 22, handles: 1900);
+        var explorer = Add("explorer.exe", @"C:\Windows\explorer.exe", Lang.T("Проводник", "File Explorer"), ms, cpu: 0.3, cpuWave: 0.2, memoryMb: 150, threads: 90, handles: 3600);
         Add("MsMpEng.exe", @"C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.24090.11-0\MsMpEng.exe", "Antimalware Service Executable", ms,
             cpu: 0.4, memoryMb: 210, threads: 40, handles: 1100);
-        Add("SearchIndexer.exe", sys32 + "SearchIndexer.exe", "Индексатор Microsoft Windows Search", ms, cpu: 0.2, memoryMb: 45, writeKb: 120);
+        Add("SearchIndexer.exe", sys32 + "SearchIndexer.exe", Lang.T("Индексатор Microsoft Windows Search", "Microsoft Windows Search Indexer"), ms, cpu: 0.2, memoryMb: 45, writeKb: 120);
 
         const string chromePath = @"C:\Program Files\Google\Chrome\Application\chrome.exe";
         var chrome = Add("chrome.exe", chromePath, "Google Chrome", "Google LLC", cpu: 1.2, cpuWave: 0.6, memoryMb: 260, parent: explorer.Pid, threads: 45, handles: 1800);
@@ -271,7 +271,7 @@ public sealed class DemoSystemSource : ISystemSource
             new()
             {
                 Index = 0, Model = "Samsung SSD 980 PRO 1TB", MediaType = DiskMediaType.Nvme, Bus = "NVMe",
-                Volumes = new[] { new VolumeState("C:", "Система", 1000 * GB, 310 * GB) },
+                Volumes = new[] { new VolumeState("C:", Lang.T("Система", "System"), 1000 * GB, 310 * GB) },
                 ActivePercent = Math.Min(100, 2 + (readC + writeC) / (40 * MB) * 45),
                 LatencyMs = 0.3 + _rnd.NextDouble() * 0.3 + (defenderScan ? 0.8 : 0),
                 ReadBps = readC, WriteBps = writeC, QueueLength = defenderScan ? 1 : 0,
@@ -279,7 +279,7 @@ public sealed class DemoSystemSource : ISystemSource
             new()
             {
                 Index = 1, Model = "ST2000DM008-2FR102", MediaType = DiskMediaType.Hdd, Bus = "SATA",
-                Volumes = new[] { new VolumeState("D:", "Игры", 2000 * GB, 640 * GB) },
+                Volumes = new[] { new VolumeState("D:", Lang.T("Игры", "Games"), 2000 * GB, 640 * GB) },
                 ActivePercent = Math.Min(100, 6 + (readD + writeD) / MB * 2.2),
                 LatencyMs = 7 + _rnd.NextDouble() * 5,
                 ReadBps = readD, WriteBps = writeD, QueueLength = 0,

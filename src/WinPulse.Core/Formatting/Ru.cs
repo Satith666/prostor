@@ -65,6 +65,10 @@ public static class Ru
 
     public static string Count(long n, string one, string few, string many) => $"{n} {Plural(n, one, few, many)}";
 
+    /// <summary>То же с английскими формами: Count(5, "процесс", "процесса", "процессов", "process", "processes").</summary>
+    public static string Count(long n, string one, string few, string many, string enOne, string enMany) =>
+        Lang.English ? $"{n} {(Math.Abs(n) == 1 ? enOne : enMany)}" : Count(n, one, few, many);
+
     private static string Num(double v, double decimalsBelow) =>
         Math.Abs(v) < decimalsBelow ? v.ToString("0.0", Culture) : v.ToString("0", Culture);
 }

@@ -26,7 +26,7 @@ public sealed class MonitorInfo
     public VrrSupport Vrr { get; init; }
     public string? ConnectionHint { get; init; }
 
-    public string Title => $"{FriendlyName} — {Width}×{Height}, {RefreshHz} Гц";
+    public string Title => Lang.T($"{FriendlyName} — {Width}×{Height}, {RefreshHz} Гц", $"{FriendlyName} — {Width}×{Height}, {RefreshHz} Hz");
 }
 
 /// <summary>Мониторы: режимы, частоты, масштаб, EDID; смена частоты; временное отключение второго монитора.</summary>

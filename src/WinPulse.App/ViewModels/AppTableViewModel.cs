@@ -5,6 +5,7 @@ using System.Windows.Media;
 using WinPulse.App.Infrastructure;
 using WinPulse.Core.Analysis;
 using WinPulse.Core.Formatting;
+using WinPulse.Core;
 
 namespace WinPulse.App.ViewModels;
 
@@ -94,9 +95,9 @@ public sealed class AppRowVm : ObservableObject
         IsCritical = g.IsCritical;
         Kind = g.Kind switch
         {
-            AppKind.Service => "Служба",
-            AppKind.System => "Система",
-            _ => "Приложение",
+            AppKind.Service => Lang.T("Служба", "Service"),
+            AppKind.System => Lang.T("Система", "System"),
+            _ => Lang.T("Приложение", "App"),
         };
         if (!_iconLoaded)
         {
@@ -106,10 +107,10 @@ public sealed class AppRowVm : ObservableObject
 
         Cpu = Ru.Percent1(g.CpuPercent);
         Memory = Ru.Bytes(g.PrivateMemory);
-        Disk = g.IoBps < 1024 ? "0 МБ/с" : Ru.Rate(g.IoBps);
+        Disk = g.IoBps < 1024 ? Lang.T("0 МБ/с", "0 MB/s") : Ru.Rate(g.IoBps);
         Gpu = g.GpuPercent < 0.5 ? "—" : Ru.Percent(g.GpuPercent);
-        Count = g.Processes.Count == 1 ? "" : Ru.Count(g.Processes.Count, "процесс", "процесса", "процессов");
-        Secondary = $"в среднем: 1 мин — {Ru.Percent1(g.CpuAvg1m)}, 5 мин — {Ru.Percent1(g.CpuAvg5m)}";
+        Count = g.Processes.Count == 1 ? "" : Ru.Count(g.Processes.Count, "процесс", "процесса", "процессов", "process", "processes");
+        Secondary = Lang.T($"в среднем: 1 мин — {Ru.Percent1(g.CpuAvg1m)}, 5 мин — {Ru.Percent1(g.CpuAvg5m)}", $"average: 1 min — {Ru.Percent1(g.CpuAvg1m)}, 5 min — {Ru.Percent1(g.CpuAvg5m)}");
 
         CpuBar = Math.Clamp(g.CpuPercent / 100, 0, 1);
         MemBar = totalMemory > 0 ? Math.Clamp((double)g.PrivateMemory / totalMemory, 0, 1) : 0;
@@ -119,7 +120,7 @@ public sealed class AppRowVm : ObservableObject
         MemHot = totalMemory > 0 && g.PrivateMemory >= totalMemory * 0.15;
         DiskHot = g.IoBps >= 20 * 1024 * 1024;
         GpuHot = g.GpuPercent >= 25;
-        Badge = g.LooksLikeLeak ? $"растёт +{Ru.Bytes(g.MemorySlopePerHour)}/ч" : null;
+        Badge = g.LooksLikeLeak ? Lang.T($"растёт +{Ru.Bytes(g.MemorySlopePerHour)}/ч", $"growing +{Ru.Bytes(g.MemorySlopePerHour)}/h") : null;
         _pids = g.Processes.Select(p => p.Pid).ToList();
 
         if (IsExpanded)
@@ -134,7 +135,7 @@ public sealed class AppRowVm : ObservableObject
                     Detail = p.Detail,
                     Cpu = Ru.Percent1(p.CpuPercent),
                     Memory = Ru.Bytes(p.PrivateMemory),
-                    Disk = p.IoBps < 1024 ? "0 МБ/с" : Ru.Rate(p.IoBps),
+                    Disk = p.IoBps < 1024 ? Lang.T("0 МБ/с", "0 MB/s") : Ru.Rate(p.IoBps),
                     Gpu = p.GpuPercent < 0.5 ? "—" : Ru.Percent(p.GpuPercent),
                     Threads = p.Threads.ToString(),
                     Handles = p.Handles.ToString(),
@@ -159,9 +160,9 @@ public sealed class AppRowVm : ObservableObject
     private async Task EndAsync()
     {
         string message = _pids.Count == 1
-            ? $"Процесс «{Name}» будет завершён без сохранения данных."
-            : $"Все процессы «{Name}» ({_pids.Count}) будут завершены без сохранения данных.";
-        if (!await Dialogs.MessageDialog.ConfirmAsync("Завершить «" + Name + "»?", message, "Завершить", danger: true)) return;
+            ? Lang.T($"Процесс «{Name}» будет завершён без сохранения данных.", $"Process “{Name}” will be ended without saving data.")
+            : Lang.T($"Все процессы «{Name}» ({_pids.Count}) будут завершены без сохранения данных.", $"All “{Name}” processes ({_pids.Count}) will be ended without saving data.");
+        if (!await Dialogs.MessageDialog.ConfirmAsync(Lang.T($"Завершить «{Name}»?", $"End “{Name}”?"), message, Lang.T("Завершить", "End task"), danger: true)) return;
         foreach (int pid in _pids)
         {
             try
@@ -232,7 +233,7 @@ public sealed class AppTableViewModel : ObservableObject
 
     public int Total { get => _total; private set { if (Set(ref _total, value)) OnPropertyChanged(nameof(ShowAllText)); } }
     public bool HasMore => _total > DefaultLimit;
-    public string ShowAllText => _showAll ? "Показать только первые " + DefaultLimit : $"Показать все ({_total})";
+    public string ShowAllText => _showAll ? Lang.T($"Показать только первые {DefaultLimit}", $"Show only the first {DefaultLimit}") : Lang.T($"Показать все ({_total})", $"Show all ({_total})");
 
     public void Update(IReadOnlyList<AppGroup> apps, long totalMemory)
     {

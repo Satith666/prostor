@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using WinPulse.Collectors.Interop;
 using WinPulse.Core.Model;
+using WinPulse.Core;
 
 namespace WinPulse.Collectors;
 
@@ -17,7 +18,7 @@ internal sealed unsafe class ProcessCollector : IDisposable
 
     public List<ProcessSample> Capture()
     {
-        if (IntPtr.Size != 8) throw new PlatformNotSupportedException("Нужна 64-битная Windows.");
+        if (IntPtr.Size != 8) throw new PlatformNotSupportedException(Lang.T("Нужна 64-битная Windows.", "64-bit Windows is required."));
 
         for (int attempt = 0; ; attempt++)
         {

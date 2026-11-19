@@ -1,5 +1,6 @@
 using System.Net.NetworkInformation;
 using WinPulse.Core.Model;
+using WinPulse.Core;
 
 namespace WinPulse.Collectors;
 
@@ -52,7 +53,7 @@ internal sealed class NetworkCollector
                     NetworkInterfaceType.Ethernet or NetworkInterfaceType.GigabitEthernet or NetworkInterfaceType.FastEthernetT => "Ethernet",
                     NetworkInterfaceType.Wireless80211 => "Wi-Fi",
                     NetworkInterfaceType.Ppp => "PPP",
-                    NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => "Мобильная сеть",
+                    NetworkInterfaceType.Wwanpp or NetworkInterfaceType.Wwanpp2 => Lang.T("Мобильная сеть", "Mobile network"),
                     _ => ni.NetworkInterfaceType.ToString(),
                 },
                 SpeedBitsPerSec = speed,

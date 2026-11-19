@@ -257,7 +257,7 @@ public sealed class NvShaderCacheItem : FixItem
     public override List<Change> PlanFix(FixContext ctx) =>
     [
         NvidiaModule.Set(this, Title, null, null, NvidiaDrs.ShaderCacheSize, TargetMb,
-            Lang.T("по умолчанию драйвера", "driver default"), "10 ГБ",
+            Lang.T("по умолчанию драйвера", "driver default"), Lang.T("10 ГБ", "10 GB"),
             Lang.T("Меньше повторной компиляции шейдеров и рывков в больших играх.", "Less shader recompilation and stutter in big games.")),
     ];
 }

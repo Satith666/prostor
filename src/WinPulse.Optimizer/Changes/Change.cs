@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using WinPulse.Core;
 
 namespace WinPulse.Optimizer.Changes;
 
@@ -105,11 +106,11 @@ public sealed class Change
     public string Location => Kind switch
     {
         ChangeKind.RegistrySet or ChangeKind.RegistryDelete =>
-            (Hive == RegHive.LocalMachine ? "HKLM\\" : "HKCU\\") + Key + " → " + (ValueName.Length == 0 ? "(по умолчанию)" : ValueName) +
+            (Hive == RegHive.LocalMachine ? "HKLM\\" : "HKCU\\") + Key + " → " + (ValueName.Length == 0 ? Lang.T("(по умолчанию)", "(default)") : ValueName) +
             (SubKey is null ? "" : " → " + SubKey),
         ChangeKind.PowerActivate or ChangeKind.PowerDelete => "powercfg " + (SchemeGuid ?? ""),
         ChangeKind.DisplayRefresh or ChangeKind.DisplayAttach => DeviceName ?? "",
-        ChangeKind.TaskEnabled => "Планировщик заданий → " + (TaskPath ?? ""),
+        ChangeKind.TaskEnabled => Lang.T("Планировщик заданий → ", "Task Scheduler → ") + (TaskPath ?? ""),
         ChangeKind.NvidiaSetting => $"NVIDIA DRS → {(NvApp ?? "Global")} → 0x{NvSettingId:X8}",
         _ => "",
     };

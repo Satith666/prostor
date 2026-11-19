@@ -61,7 +61,7 @@ public sealed class AppGrouper
             var owner = FindOwner(p, byPid);
             if (owner is not null && keyByPid.TryGetValue(owner.Pid, out var ownerKey) && groups.TryGetValue(ownerKey, out var ownerGroup))
             {
-                AddProcess(ownerGroup, p, rates, snap, "помощник: " + StripExe(p.Name));
+                AddProcess(ownerGroup, p, rates, snap, Lang.T("помощник: ", "helper: ") + StripExe(p.Name));
                 keyByPid[p.Pid] = ownerKey;
             }
             else
@@ -128,14 +128,14 @@ public sealed class AppGrouper
                 var sorted = list.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToList();
                 key = "svc:" + sorted[0].Name.ToLowerInvariant();
                 display = sorted[0].DisplayName.Length > 0 ? sorted[0].DisplayName : sorted[0].Name;
-                if (sorted.Count > 1) display += $" и ещё {sorted.Count - 1}";
-                detail = "службы: " + string.Join(", ", sorted.Select(s => s.Name));
-                hint = "Служба Windows. Имя службы: " + string.Join(", ", sorted.Select(s => s.Name)) + ".";
+                if (sorted.Count > 1) display += Lang.T($" и ещё {sorted.Count - 1}", $" and {sorted.Count - 1} more");
+                detail = Lang.T("службы: ", "services: ") + string.Join(", ", sorted.Select(s => s.Name));
+                hint = Lang.T("Служба Windows. Имя службы: ", "Windows service. Service name: ") + string.Join(", ", sorted.Select(s => s.Name)) + ".";
             }
             else
             {
                 key = "svc:pid" + p.Pid;
-                display = "Служба Windows (svchost)";
+                display = Lang.T("Служба Windows (svchost)", "Windows service (svchost)");
             }
             if (groups.TryGetValue(key, out var existing)) return existing;
             var g = new AppGroup

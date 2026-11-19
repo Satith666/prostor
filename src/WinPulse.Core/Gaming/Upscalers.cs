@@ -72,7 +72,7 @@ public static class UpscalerCatalog
     {
         string p = relativePath.ToLowerInvariant();
         foreach (var (marker, name) in AntiCheats)
-            if (p.Contains(marker, StringComparison.Ordinal)) return name;
+            if (p.Contains(marker, StringComparison.Ordinal)) return name == "античит" ? Lang.T("античит", "anti-cheat") : name;
         return null;
     }
 

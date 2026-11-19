@@ -5,6 +5,7 @@ using WinPulse.App.Infrastructure;
 using WinPulse.Collectors.Drivers;
 using WinPulse.Core.Analysis;
 using WinPulse.Core.Drivers;
+using WinPulse.Core;
 
 namespace WinPulse.App.ViewModels;
 
@@ -75,7 +76,7 @@ public sealed class DriversViewModel : PageViewModel
 {
     private bool _isBusy;
     private bool _scanned;
-    private string _summary = "Список ещё не загружен.";
+    private string _summary = Lang.T("Список ещё не загружен.", "The list is not loaded yet.");
     private string _gpuTitle = "";
     private string _gpuText = "";
     private IReadOnlyList<string> _cleanSteps = [];
@@ -130,15 +131,15 @@ public sealed class DriversViewModel : PageViewModel
 
             int attention = rows.Count(r => r.Severity >= Severity.Warning);
             Summary = rows.Count == 0
-                ? "Не удалось получить список драйверов."
-                : $"Драйверов проверено: {rows.Count}" + (attention > 0 ? $" · требуют внимания: {attention}" : " · всё в порядке");
+                ? Lang.T("Не удалось получить список драйверов.", "Couldn't get the driver list.")
+                : Lang.T($"Драйверов проверено: {rows.Count}", $"Drivers checked: {rows.Count}") + (attention > 0 ? Lang.T($" · требуют внимания: {attention}", $" · need attention: {attention}") : Lang.T(" · всё в порядке", " · all fine"));
 
             var gpu = rows.Where(r => r.Category == DriverCategory.Graphics && r.Vendor is "NVIDIA" or "AMD" or "Intel")
                 .OrderByDescending(r => r.Vendor == "NVIDIA" || r.Vendor == "AMD").FirstOrDefault();
             if (gpu is not null)
             {
-                GpuTitle = $"{gpu.Info.DeviceName}: драйвер {(gpu.FriendlyVersion ?? gpu.Info.Version)} от {gpu.Info.Date:dd.MM.yyyy}";
-                GpuText = gpu.Advice + " Драйверы берите только с сайта производителя или через Центр обновления Windows — сторонние «обновлялки» драйверов часто ставят не то.";
+                GpuTitle = Lang.T($"{gpu.Info.DeviceName}: драйвер {(gpu.FriendlyVersion ?? gpu.Info.Version)} от {gpu.Info.Date:dd.MM.yyyy}", $"{gpu.Info.DeviceName}: driver {(gpu.FriendlyVersion ?? gpu.Info.Version)} dated {gpu.Info.Date:dd.MM.yyyy}");
+                GpuText = gpu.Advice + Lang.T(" Драйверы берите только с сайта производителя или через Центр обновления Windows — сторонние «обновлялки» драйверов часто ставят не то.", " Get drivers only from the maker's site or Windows Update — third-party “driver updaters” often install the wrong thing.");
                 CleanSteps = DriverAnalysis.CleanInstallSteps(gpu.Vendor).Select((s, i) => $"{i + 1}. {s}").ToList();
             }
             else
@@ -151,7 +152,7 @@ public sealed class DriversViewModel : PageViewModel
         catch (Exception ex)
         {
             Log.Error("drivers", ex);
-            Summary = "Не удалось получить список драйверов: " + ex.Message;
+            Summary = Lang.T("Не удалось получить список драйверов: ", "Couldn't get the driver list: ") + ex.Message;
         }
         finally
         {

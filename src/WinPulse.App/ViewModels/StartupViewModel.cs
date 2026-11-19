@@ -30,7 +30,7 @@ public sealed class StartupRowVm : ObservableObject
         AdviceText = StartupKnowledge.AdviceText(tip.Advice);
         AdviceTip = tip.Text;
         Memory = memory;
-        MemoryText = memory is long m ? "сейчас " + Ru.Bytes(m) : entry.Enabled ? "сейчас не запущена" : "";
+        MemoryText = memory is long m ? Lang.T("сейчас ", "now ") + Ru.Bytes(m) : entry.Enabled ? Lang.T("сейчас не запущена", "not running now") : "";
         Icon = IconCache.Get(entry.ExePath);
         ToggleCommand = new AsyncCommand(() => owner.ToggleAsync(this), () => !owner.IsBusy);
         OpenFolderCommand = new RelayCommand(OpenFolder, () => entry.ExePath is not null && File.Exists(entry.ExePath));
@@ -42,8 +42,8 @@ public sealed class StartupRowVm : ObservableObject
     public string Source => Entry.SourceText + (Entry.TriggerText is null ? "" : " · " + Entry.TriggerText);
     public string Command => Entry.Command;
     public bool Enabled => Entry.Enabled;
-    public string StatusText => Entry.Enabled ? "Включена" : "Отключена";
-    public string ToggleLabel => Entry.Enabled ? "Отключить" : "Включить";
+    public string StatusText => Entry.Enabled ? Lang.T("Включена", "Enabled") : Lang.T("Отключена", "Disabled");
+    public string ToggleLabel => Entry.Enabled ? Lang.T("Отключить", "Disable") : Lang.T("Включить", "Enable");
     public bool NeedsAdmin => Entry.NeedsAdmin;
     public StartupAdvice Advice { get; }
     /// <summary>disable | optional | keep</summary>
@@ -76,7 +76,7 @@ public sealed class StartupViewModel : PageViewModel
     private readonly Func<MonitorFrame?> _frame;
     private bool _isBusy;
     private bool _scanned;
-    private string _summary = "Список ещё не загружен.";
+    private string _summary = Lang.T("Список ещё не загружен.", "The list is not loaded yet.");
     private string _memoryText = "";
     private string _busyText = "";
     private string _backupText = "";
@@ -117,8 +117,8 @@ public sealed class StartupViewModel : PageViewModel
     public bool HasBackup { get => _hasBackup; private set => Set(ref _hasBackup, value); }
 
     public string DisableRecommendedText => _recommendedCount > 0
-        ? $"Отключить то, что можно ({_recommendedCount})"
-        : "Отключать нечего";
+        ? Lang.T($"Отключить то, что можно ({_recommendedCount})", $"Disable what can go ({_recommendedCount})")
+        : Lang.T("Отключать нечего", "Nothing to disable");
 
     public override void OnShown()
     {
@@ -129,7 +129,7 @@ public sealed class StartupViewModel : PageViewModel
     {
         if (IsBusy) return;
         IsBusy = true;
-        BusyText = "Читаю автозагрузку…";
+        BusyText = Lang.T("Читаю автозагрузку…", "Reading startup items…");
         try
         {
             var entries = await Task.Run(() => _manager.Scan());
@@ -155,10 +155,10 @@ public sealed class StartupViewModel : PageViewModel
 
             int enabled = rows.Count(r => r.Enabled);
             int disabled = rows.Count - enabled;
-            Summary = $"Запускаются вместе с Windows: {enabled}" + (disabled > 0 ? $" · отключено: {disabled}" : "");
+            Summary = Lang.T($"Запускаются вместе с Windows: {enabled}", $"Start with Windows: {enabled}") + (disabled > 0 ? Lang.T($" · отключено: {disabled}", $" · disabled: {disabled}") : "");
             long memory = rows.Where(r => r.Enabled).Sum(r => r.Memory ?? 0);
             MemoryText = memory > 0
-                ? $"Включённые программы автозагрузки сейчас занимают {Ru.Bytes(memory)} оперативной памяти."
+                ? Lang.T($"Включённые программы автозагрузки сейчас занимают {Ru.Bytes(memory)} оперативной памяти.", $"Enabled startup programs are now using {Ru.Bytes(memory)} of RAM.")
                 : "";
             _recommendedCount = rows.Count(r => r.Enabled && r.Advice == StartupAdvice.CanDisable);
             OnPropertyChanged(nameof(DisableRecommendedText));
@@ -167,7 +167,7 @@ public sealed class StartupViewModel : PageViewModel
         catch (Exception ex)
         {
             Log.Error("startup-refresh", ex);
-            Summary = "Не удалось прочитать автозагрузку: " + ex.Message;
+            Summary = Lang.T("Не удалось прочитать автозагрузку: ", "Couldn't read startup items: ") + ex.Message;
         }
         finally
         {
@@ -180,8 +180,8 @@ public sealed class StartupViewModel : PageViewModel
         int n = _manager.Module.Backup.Entries.Count;
         HasBackup = n > 0;
         BackupText = n == 0
-            ? "WinPulse ещё ничего не менял в автозагрузке."
-            : $"Изменено WinPulse: {n}. «Вернуть всё как было» восстановит исходное состояние.";
+            ? Lang.T("WinPulse ещё ничего не менял в автозагрузке.", "WinPulse hasn't changed anything in startup yet.")
+            : Lang.T($"Изменено WinPulse: {n}. «Вернуть всё как было» восстановит исходное состояние.", $"Changed by WinPulse: {n}. “Revert everything” restores the original state.");
     }
 
     public async Task ToggleAsync(StartupRowVm row)
@@ -196,21 +196,21 @@ public sealed class StartupViewModel : PageViewModel
             .Select(r => StartupManager.PlanToggle(r.Entry, enable: false))
             .ToList();
         if (plan.Count == 0) return;
-        await ApplyAsync("Отключить автозапуск программ, которые легко запустить вручную", plan);
+        await ApplyAsync(Lang.T("Отключить автозапуск программ, которые легко запустить вручную", "Disable autostart for programs that are easy to start by hand"), plan);
     }
 
     private async Task RevertAllAsync()
     {
         var plan = _manager.Module.PlanRevert(null);
         if (plan.Count == 0) return;
-        await ApplyAsync("Вернуть автозагрузку как было", plan);
+        await ApplyAsync(Lang.T("Вернуть автозагрузку как было", "Restore startup as it was"), plan);
     }
 
     private async Task ApplyAsync(string title, List<Change> plan)
     {
         if (!ChangesDialog.Confirm(title, plan)) return;
         IsBusy = true;
-        BusyText = "Применяю изменения…";
+        BusyText = Lang.T("Применяю изменения…", "Applying changes…");
         List<ChangeResult> results;
         try
         {

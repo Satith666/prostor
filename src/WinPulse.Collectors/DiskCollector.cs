@@ -120,7 +120,7 @@ internal sealed unsafe class DiskCollector
 
     internal static (string Model, DiskMediaType Type, string Bus) QueryStatic(int index)
     {
-        string model = $"Диск {index}";
+        string model = Lang.T($"Диск {index}", $"Disk {index}");
         var type = DiskMediaType.Unknown;
         string bus = "";
         try

@@ -34,15 +34,19 @@ public sealed class KpiVm : ObservableObject
     private string _sub = "";
     private double[] _spark = [];
 
-    public KpiVm(string title, string target, Brush brush, double sparkMax, Action<string> navigate)
+    private readonly string _titleRu, _titleEn;
+
+    public KpiVm(string titleRu, string titleEn, string target, Brush brush, double sparkMax, Action<string> navigate)
     {
-        Title = title;
+        _titleRu = titleRu;
+        _titleEn = titleEn;
+        Lang.Changed += () => OnPropertyChanged(nameof(Title));
         Brush = brush;
         SparkMax = sparkMax;
         OpenCommand = new RelayCommand(() => navigate(target));
     }
 
-    public string Title { get; }
+    public string Title => Lang.English ? _titleEn : _titleRu;
     public Brush Brush { get; }
     public double SparkMax { get; }
     public ICommand OpenCommand { get; }
@@ -108,11 +112,11 @@ public sealed class OverviewViewModel : PageViewModel
 
     public OverviewViewModel(Action<string> navigate)
     {
-        Cpu = new KpiVm("Процессор", "cpu", Res("Series.Cpu"), 100, navigate);
-        Memory = new KpiVm("Память", "memory", Res("Series.Memory"), 100, navigate);
-        Disk = new KpiVm("Диски", "disk", Res("Series.Disk"), 100, navigate);
-        Gpu = new KpiVm("Видеокарта", "gpu", Res("Series.Gpu"), 100, navigate);
-        Network = new KpiVm("Сеть", "network", Res("Series.Net"), double.NaN, navigate);
+        Cpu = new KpiVm("Процессор", "Processor", "cpu", Res("Series.Cpu"), 100, navigate);
+        Memory = new KpiVm("Память", "Memory", "memory", Res("Series.Memory"), 100, navigate);
+        Disk = new KpiVm("Диски", "Disks", "disk", Res("Series.Disk"), 100, navigate);
+        Gpu = new KpiVm("Видеокарта", "Graphics", "gpu", Res("Series.Gpu"), 100, navigate);
+        Network = new KpiVm("Сеть", "Network", "network", Res("Series.Net"), double.NaN, navigate);
         Table = new AppTableViewModel("cpu");
         MetricCommand = new RelayCommand(p => Metric = p as string ?? "cpu");
         Kpis = new[] { Cpu, Memory, Disk, Gpu, Network };
@@ -172,23 +176,23 @@ public sealed class OverviewViewModel : PageViewModel
     {
         var raw = f.Raw;
         var h = f.History;
-        SystemLine = $"{f.Info.OsName} · {f.Info.CpuName} · {Ru.Bytes(f.Info.InstalledMemory)} · работает {Ru.Duration(raw.Cpu.Uptime)}";
+        SystemLine = Lang.T($"{f.Info.OsName} · {f.Info.CpuName} · {Ru.Bytes(f.Info.InstalledMemory)} · работает {Ru.Duration(raw.Cpu.Uptime)}", $"{f.Info.OsName} · {f.Info.CpuName} · {Ru.Bytes(f.Info.InstalledMemory)} · up {Ru.Duration(raw.Cpu.Uptime)}");
 
         Cpu.Value = Ru.Percent(raw.Cpu.UtilityPercent);
         Cpu.Percent = raw.Cpu.UtilityPercent;
         Cpu.Main = raw.Cpu.EffectiveMHz is double cpuMhz ? Ru.GHz(cpuMhz) : Ru.Percent(raw.Cpu.UtilityPercent);
         Cpu.Short = f.Sensors?.CpuTemp is double cpuTemp
-            ? $"{cpuTemp:0} °C · {Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов")}"
-            : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
-        Cpu.Sub = raw.Cpu.EffectiveMHz is double mhz ? Ru.GHz(mhz) + " · " + Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов")
-            : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
+            ? $"{cpuTemp:0} °C · {Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов", "process", "processes")}"
+            : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов", "process", "processes");
+        Cpu.Sub = raw.Cpu.EffectiveMHz is double mhz ? Ru.GHz(mhz) + " · " + Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов", "process", "processes")
+            : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов", "process", "processes");
         Cpu.Spark = HistorySnapshot.Tail(h.Cpu, 60);
 
         Memory.Value = Ru.Percent(raw.Memory.UsedPercent);
-        Memory.Sub = $"{Ru.Bytes(f.Memory.InUse)} из {Ru.Bytes(f.Memory.Total)}";
+        Memory.Sub = Lang.T($"{Ru.Bytes(f.Memory.InUse)} из {Ru.Bytes(f.Memory.Total)}", $"{Ru.Bytes(f.Memory.InUse)} of {Ru.Bytes(f.Memory.Total)}");
         Memory.Percent = raw.Memory.UsedPercent;
         Memory.Main = UsedOfTotal(f.Memory.InUse, f.Memory.Total);
-        Memory.Short = "свободно " + Ru.Bytes(Math.Max(0, f.Memory.Total - f.Memory.InUse));
+        Memory.Short = Lang.T("свободно ", "free ") + Ru.Bytes(Math.Max(0, f.Memory.Total - f.Memory.InUse));
         Memory.Spark = HistorySnapshot.Tail(h.MemPercent, 60);
 
         var busiest = raw.Disks.OrderByDescending(d => d.ActivePercent).FirstOrDefault();
@@ -204,17 +208,17 @@ public sealed class OverviewViewModel : PageViewModel
         else
         {
             Disk.Value = "—";
-            Disk.Sub = "нет данных";
+            Disk.Sub = Lang.T("нет данных", "no data");
             Disk.Percent = 0;
             Disk.Main = "—";
-            Disk.Short = "нет данных";
+            Disk.Short = Lang.T("нет данных", "no data");
         }
 
         var gpu = raw.Gpus.OrderByDescending(g => g.UtilPercent).FirstOrDefault();
         if (gpu is not null)
         {
             Gpu.Value = Ru.Percent(gpu.UtilPercent);
-            Gpu.Sub = gpu.DedicatedTotal > 0 ? $"видеопамять {Ru.Bytes(gpu.DedicatedUsed)} из {Ru.Bytes(gpu.DedicatedTotal)}" : gpu.Name;
+            Gpu.Sub = gpu.DedicatedTotal > 0 ? Lang.T($"видеопамять {Ru.Bytes(gpu.DedicatedUsed)} из {Ru.Bytes(gpu.DedicatedTotal)}", $"VRAM {Ru.Bytes(gpu.DedicatedUsed)} of {Ru.Bytes(gpu.DedicatedTotal)}") : gpu.Name;
             Gpu.Percent = gpu.UtilPercent;
             Gpu.Main = ShortGpuName(gpu.Name);
             string vram = gpu.DedicatedTotal > 0 ? UsedOfTotal(gpu.DedicatedUsed, gpu.DedicatedTotal) : "";
@@ -224,17 +228,17 @@ public sealed class OverviewViewModel : PageViewModel
         else
         {
             Gpu.Value = "—";
-            Gpu.Sub = "нет данных";
+            Gpu.Sub = Lang.T("нет данных", "no data");
             Gpu.Percent = 0;
             Gpu.Main = "—";
-            Gpu.Short = "нет данных";
+            Gpu.Short = Lang.T("нет данных", "no data");
         }
 
         double rx = raw.Network.Sum(n => n.ReceiveBps), tx = raw.Network.Sum(n => n.SendBps);
         Network.Value = Ru.Bits(rx + tx);
         Network.Sub = $"↓ {Ru.Bits(rx)} · ↑ {Ru.Bits(tx)}";
         Network.Spark = HistorySnapshot.Tail(h.NetRx, 60);
-        NetText = $"Сеть ↓ {Ru.Bits(rx)} · ↑ {Ru.Bits(tx)}";
+        NetText = Lang.T($"Сеть ↓ {Ru.Bits(rx)} · ↑ {Ru.Bits(tx)}", $"Network ↓ {Ru.Bits(rx)} · ↑ {Ru.Bits(tx)}");
 
         CpuChart = HistorySnapshot.Tail(h.Cpu, 120);
         GpuChart = HistorySnapshot.Tail(h.GpuUtil, 120);
@@ -242,7 +246,7 @@ public sealed class OverviewViewModel : PageViewModel
         int problems = f.Verdicts.Count(v => v.Severity >= Severity.Warning);
         bool critical = f.Verdicts.Any(v => v.Severity == Severity.Critical);
         StatusLevel = critical ? "bad" : problems > 0 ? "warn" : "ok";
-        StatusText = problems == 0 ? "Всё спокойно" : $"{Ru.Count(problems, "проблема", "проблемы", "проблем")} сейчас";
+        StatusText = problems == 0 ? Lang.T("Всё спокойно", "All quiet") : Lang.T($"{Ru.Count(problems, "проблема", "проблемы", "проблем")} сейчас", $"{Ru.Count(problems, "", "", "", "problem", "problems")} now");
 
         var verdicts = f.Verdicts.Take(6).ToList();
         CollectionSync.Sync(Verdicts, verdicts, v => v.Area + "|" + v.Title, vm => vm.Key, v => new VerdictVm(v.Area + "|" + v.Title),
@@ -259,10 +263,10 @@ public sealed class OverviewViewModel : PageViewModel
     /// <summary>«12,4 / 16 ГБ» — компактно для карточки датчика.</summary>
     private static string UsedOfTotal(double used, double total)
     {
-        var ru = System.Globalization.CultureInfo.GetCultureInfo("ru-RU");
+
         const double Gb = 1024d * 1024 * 1024;
         if (total < Gb) return $"{Ru.Bytes((long)used)} / {Ru.Bytes((long)total)}";
-        return string.Format(ru, "{0:0.0} / {1:0.#} ГБ", used / Gb, total / Gb);
+        return string.Format(Ru.Culture, Lang.T("{0:0.0} / {1:0.#} ГБ", "{0:0.0} / {1:0.#} GB"), used / Gb, total / Gb);
     }
 
     /// <summary>«NVIDIA GeForce RTX 3050» → «RTX 3050»: на датчике мало места.</summary>
@@ -279,14 +283,21 @@ public sealed class StatVm : ObservableObject
 {
     private string _value = "";
 
-    public StatVm(string label, string? hint = null)
+    private readonly string _labelRu, _labelEn;
+    private readonly string? _hintRu, _hintEn;
+
+    public StatVm(string labelRu, string labelEn, string? hintRu = null, string? hintEn = null)
     {
-        Label = label;
-        Hint = hint;
+        (_labelRu, _labelEn, _hintRu, _hintEn) = (labelRu, labelEn, hintRu, hintEn);
+        Lang.Changed += () =>
+        {
+            OnPropertyChanged(nameof(Label));
+            OnPropertyChanged(nameof(Hint));
+        };
     }
 
-    public string Label { get; }
-    public string? Hint { get; }
+    public string Label => Lang.English ? _labelEn : _labelRu;
+    public string? Hint => Lang.English ? _hintEn : _hintRu;
     public string Value { get => _value; set => Set(ref _value, value); }
 }
 
@@ -297,14 +308,14 @@ public sealed class CpuViewModel : PageViewModel
 
     public CpuViewModel()
     {
-        Speed = new StatVm("Частота сейчас", "Средняя по всем ядрам с учётом турбо-режима.");
-        BaseSpeed = new StatVm("Базовая частота");
-        Processes = new StatVm("Процессы");
-        Threads = new StatVm("Потоки");
-        Handles = new StatVm("Дескрипторы", "Открытые программами файлы, ключи реестра и другие объекты.");
-        Uptime = new StatVm("Работает без перезагрузки");
-        Temperature = new StatVm("Температура", "Самый горячий датчик процессора (Package или Tctl/Tdie).");
-        Power = new StatVm("Мощность", "Потребление процессора по его собственному датчику.");
+        Speed = new StatVm("Частота сейчас", "Current clock", "Средняя по всем ядрам с учётом турбо-режима.", "Average over all cores, including turbo.");
+        BaseSpeed = new StatVm("Базовая частота", "Base clock");
+        Processes = new StatVm("Процессы", "Processes");
+        Threads = new StatVm("Потоки", "Threads");
+        Handles = new StatVm("Дескрипторы", "Handles", "Открытые программами файлы, ключи реестра и другие объекты.", "Files, registry keys and other objects opened by programs.");
+        Uptime = new StatVm("Работает без перезагрузки", "Uptime");
+        Temperature = new StatVm("Температура", "Temperature", "Самый горячий датчик процессора (Package или Tctl/Tdie).", "The hottest CPU sensor (Package or Tctl/Tdie).");
+        Power = new StatVm("Мощность", "Power", "Потребление процессора по его собственному датчику.", "CPU power draw from its own sensor.");
         Stats = new[] { Speed, BaseSpeed, Temperature, Power, Processes, Threads, Handles, Uptime };
         Table = new AppTableViewModel("cpu");
     }
@@ -329,7 +340,7 @@ public sealed class CpuViewModel : PageViewModel
     public override void Update(MonitorFrame f)
     {
         var c = f.Raw.Cpu;
-        Title = $"{f.Info.CpuName} · {Ru.Count(f.Info.LogicalCores, "логический процессор", "логических процессора", "логических процессоров")}";
+        Title = $"{f.Info.CpuName} · {Ru.Count(f.Info.LogicalCores, "логический процессор", "логических процессора", "логических процессоров", "logical processor", "logical processors")}";
         Chart = f.History.Cpu;
         Utility = Ru.Percent(c.UtilityPercent);
         Speed.Value = c.EffectiveMHz is double e ? Ru.GHz(e) : "—";
@@ -339,8 +350,8 @@ public sealed class CpuViewModel : PageViewModel
         Handles.Value = c.HandleCount.ToString("N0", Ru.Culture);
         Uptime.Value = Ru.Duration(c.Uptime);
         var sensors = f.Sensors;
-        Temperature.Value = sensors?.CpuTemp is double t ? $"{t:0} °C" : sensors?.CpuNeedsDriver == true ? "нужен PawnIO" : "—";
-        Power.Value = sensors?.CpuPower is double w ? $"{w:0} Вт" : "—";
+        Temperature.Value = sensors?.CpuTemp is double t ? $"{t:0} °C" : sensors?.CpuNeedsDriver == true ? Lang.T("нужен PawnIO", "needs PawnIO") : "—";
+        Power.Value = sensors?.CpuPower is double w ? Lang.T($"{w:0} Вт", $"{w:0} W") : "—";
         var v = f.Verdicts.FirstOrDefault(x => x.Area == "cpu");
         Verdict = v?.Title ?? "";
         VerdictDetail = v?.Detail ?? "";
@@ -352,16 +363,22 @@ public sealed class LegendVm : ObservableObject
 {
     private string _value = "";
 
-    public LegendVm(string name, Brush brush, string hint)
+    private readonly string _nameRu, _nameEn, _hintRu, _hintEn;
+
+    public LegendVm(string nameRu, string nameEn, Brush brush, string hintRu, string hintEn)
     {
-        Name = name;
+        (_nameRu, _nameEn, _hintRu, _hintEn) = (nameRu, nameEn, hintRu, hintEn);
         Brush = brush;
-        Hint = hint;
+        Lang.Changed += () =>
+        {
+            OnPropertyChanged(nameof(Name));
+            OnPropertyChanged(nameof(Hint));
+        };
     }
 
-    public string Name { get; }
+    public string Name => Lang.English ? _nameEn : _nameRu;
     public Brush Brush { get; }
-    public string Hint { get; }
+    public string Hint => Lang.English ? _hintEn : _hintRu;
     public string Value { get => _value; set => Set(ref _value, value); }
 }
 
@@ -373,20 +390,20 @@ public sealed class MemoryViewModel : PageViewModel
 
     public MemoryViewModel()
     {
-        Programs = new LegendVm("Программы", Res("Mem.Programs"), "Личная память всех запущенных программ.");
-        SystemPart = new LegendVm("Система и драйверы", Res("Mem.System"), "Ядро Windows, драйверы, общие библиотеки и кэш файловой системы в работе.");
-        Compressed = new LegendVm("Сжатая", Res("Mem.Compressed"), "Редко используемые данные, которые Windows сжала вместо записи на диск.");
-        Modified = new LegendVm("Ждёт записи", Res("Mem.Modified"), "Изменённые данные, которые Windows скоро запишет на диск.");
-        Standby = new LegendVm("Кэш", Res("Mem.Standby"), "Недавно прочитанные файлы. Отдаётся программам мгновенно — это не «занятая» память.");
-        Free = new LegendVm("Свободно", Res("Mem.Free"), "Совсем пустая память.");
+        Programs = new LegendVm("Программы", "Programs", Res("Mem.Programs"), "Личная память всех запущенных программ.", "Private memory of all running programs.");
+        SystemPart = new LegendVm("Система и драйверы", "System and drivers", Res("Mem.System"), "Ядро Windows, драйверы, общие библиотеки и кэш файловой системы в работе.", "Windows kernel, drivers, shared libraries and the active file system cache.");
+        Compressed = new LegendVm("Сжатая", "Compressed", Res("Mem.Compressed"), "Редко используемые данные, которые Windows сжала вместо записи на диск.", "Rarely used data that Windows compressed instead of writing to disk.");
+        Modified = new LegendVm("Ждёт записи", "Modified", Res("Mem.Modified"), "Изменённые данные, которые Windows скоро запишет на диск.", "Changed data that Windows will write to disk soon.");
+        Standby = new LegendVm("Кэш", "Cache", Res("Mem.Standby"), "Недавно прочитанные файлы. Отдаётся программам мгновенно — это не «занятая» память.", "Recently read files. Handed to programs instantly — this is not “used” memory.");
+        Free = new LegendVm("Свободно", "Free", Res("Mem.Free"), "Совсем пустая память.", "Completely empty memory.");
         Legend = new[] { Programs, SystemPart, Compressed, Modified, Standby, Free };
 
-        Available = new StatVm("Доступно", "Кэш + свободно: столько программы могут получить прямо сейчас.");
-        Commit = new StatVm("Выделено / лимит", "Сколько памяти программы попросили у Windows, и предел с учётом файла подкачки.");
-        Faults = new StatVm("Подкачка с диска", "Сколько страниц в секунду Windows читает с диска из-за нехватки памяти. Норма — почти ноль.");
-        Paged = new StatVm("Выгружаемый пул ядра");
-        NonPaged = new StatVm("Невыгружаемый пул ядра", "Если растёт часами — утечка в драйвере.");
-        Reserved = new StatVm("Зарезервировано оборудованием", "Память, которую забрали встроенная графика и устройства.");
+        Available = new StatVm("Доступно", "Available", "Кэш + свободно: столько программы могут получить прямо сейчас.", "Cache + free: what programs can get right now.");
+        Commit = new StatVm("Выделено / лимит", "Committed / limit", "Сколько памяти программы попросили у Windows, и предел с учётом файла подкачки.", "How much memory programs asked Windows for, and the limit including the page file.");
+        Faults = new StatVm("Подкачка с диска", "Paging from disk", "Сколько страниц в секунду Windows читает с диска из-за нехватки памяти. Норма — почти ноль.", "Pages per second Windows reads from disk due to low memory. Normal is near zero.");
+        Paged = new StatVm("Выгружаемый пул ядра", "Kernel paged pool");
+        NonPaged = new StatVm("Невыгружаемый пул ядра", "Kernel non-paged pool", "Если растёт часами — утечка в драйвере.", "If it grows for hours, a driver is leaking.");
+        Reserved = new StatVm("Зарезервировано оборудованием", "Hardware reserved", "Память, которую забрали встроенная графика и устройства.", "Memory taken by integrated graphics and devices.");
         Stats = new[] { Available, Commit, Faults, Paged, NonPaged, Reserved };
         Table = new AppTableViewModel("memory");
     }
@@ -419,7 +436,7 @@ public sealed class MemoryViewModel : PageViewModel
         var m = f.Raw.Memory;
         var b = f.Memory;
         Chart = f.History.MemPercent;
-        Used = $"{Ru.Bytes(b.InUse)} из {Ru.Bytes(b.Total)}";
+        Used = Lang.T($"{Ru.Bytes(b.InUse)} из {Ru.Bytes(b.Total)}", $"{Ru.Bytes(b.InUse)} of {Ru.Bytes(b.Total)}");
         UsedPercent = Ru.Percent(m.UsedPercent);
         Segments = new[]
         {
@@ -439,7 +456,7 @@ public sealed class MemoryViewModel : PageViewModel
 
         Available.Value = Ru.Bytes(m.Available);
         Commit.Value = $"{Ru.Bytes(m.CommitTotal)} / {Ru.Bytes(m.CommitLimit)}";
-        Faults.Value = m.HardFaultsPerSec is double hf ? $"{hf:0} стр./с" : "—";
+        Faults.Value = m.HardFaultsPerSec is double hf ? Lang.T($"{hf:0} стр./с", $"{hf:0} pages/s") : "—";
         Paged.Value = Ru.Bytes(m.KernelPaged);
         NonPaged.Value = Ru.Bytes(m.KernelNonPaged);
         Reserved.Value = Ru.Bytes(b.HardwareReserved);
@@ -503,8 +520,8 @@ public sealed class DiskViewModel : PageViewModel
             {
                 DiskMediaType.Nvme => "NVMe SSD",
                 DiskMediaType.Ssd => "SSD" + (d.Bus.Length > 0 ? " · " + d.Bus : ""),
-                DiskMediaType.Hdd => "Жёсткий диск (HDD)" + (d.Bus.Length > 0 ? " · " + d.Bus : ""),
-                _ => d.Bus.Length > 0 ? d.Bus : "Тип не определён",
+                DiskMediaType.Hdd => Lang.T("Жёсткий диск (HDD)", "Hard disk (HDD)") + (d.Bus.Length > 0 ? " · " + d.Bus : ""),
+                _ => d.Bus.Length > 0 ? d.Bus : Lang.T("Тип не определён", "Type unknown"),
             };
             vm.Active = Ru.Percent(d.ActivePercent);
             vm.Latency = Ru.Ms(d.LatencyMs);
@@ -521,7 +538,7 @@ public sealed class DiskViewModel : PageViewModel
             {
                 Name = vol.Label is null ? vol.Letter : $"{vol.Letter} {vol.Label}",
                 Fraction = vol.TotalBytes > 0 ? 1 - (double)vol.FreeBytes / vol.TotalBytes : 0,
-                Text = vol.TotalBytes > 0 ? $"свободно {Ru.Bytes(vol.FreeBytes)} из {Ru.Bytes(vol.TotalBytes)}" : "нет данных",
+                Text = vol.TotalBytes > 0 ? Lang.T($"свободно {Ru.Bytes(vol.FreeBytes)} из {Ru.Bytes(vol.TotalBytes)}", $"{Ru.Bytes(vol.FreeBytes)} free of {Ru.Bytes(vol.TotalBytes)}") : Lang.T("нет данных", "no data"),
                 Low = vol.TotalBytes > 0 && vol.FreeBytes < vol.TotalBytes * 0.1,
             }).ToList();
         });
@@ -579,11 +596,11 @@ public sealed class GpuViewModel : PageViewModel
     private static string EngineName(string e) => e switch
     {
         "3D" => "3D",
-        "Copy" => "Копирование",
-        "VideoDecode" => "Декодирование видео",
-        "VideoEncode" => "Кодирование видео",
-        "VideoProcessing" => "Обработка видео",
-        "Compute_0" or "Compute_1" or "Compute" => "Вычисления",
+        "Copy" => Lang.T("Копирование", "Copy"),
+        "VideoDecode" => Lang.T("Декодирование видео", "Video decode"),
+        "VideoEncode" => Lang.T("Кодирование видео", "Video encode"),
+        "VideoProcessing" => Lang.T("Обработка видео", "Video processing"),
+        "Compute_0" or "Compute_1" or "Compute" => Lang.T("Вычисления", "Compute"),
         _ => e,
     };
 
@@ -594,7 +611,7 @@ public sealed class GpuViewModel : PageViewModel
         {
             vm.Name = g.Name;
             vm.Util = Ru.Percent(g.UtilPercent);
-            vm.Vram = g.DedicatedTotal > 0 ? $"{Ru.Bytes(g.DedicatedUsed)} из {Ru.Bytes(g.DedicatedTotal)}" : Ru.Bytes(g.DedicatedUsed);
+            vm.Vram = g.DedicatedTotal > 0 ? Lang.T($"{Ru.Bytes(g.DedicatedUsed)} из {Ru.Bytes(g.DedicatedTotal)}", $"{Ru.Bytes(g.DedicatedUsed)} of {Ru.Bytes(g.DedicatedTotal)}") : Ru.Bytes(g.DedicatedUsed);
             vm.VramFraction = g.DedicatedTotal > 0 ? (double)g.DedicatedUsed / g.DedicatedTotal : 0;
             vm.Chart = f.History.Gpus.TryGetValue(g.Luid, out var h) ? h.Util : [];
             vm.Engines = g.EngineUtil
@@ -606,11 +623,11 @@ public sealed class GpuViewModel : PageViewModel
 
         var sn = f.Sensors;
         var parts = new List<string>();
-        if (sn?.GpuTemp is double gt) parts.Add(sn.GpuHotspot is double hs ? $"{gt:0} °C (горячая точка {hs:0} °C)" : $"{gt:0} °C");
-        if (sn?.GpuPower is double gp) parts.Add($"{gp:0} Вт");
-        if (sn?.GpuClockMHz is double gc) parts.Add($"{gc:0} МГц");
-        if (sn?.GpuFanPercent is double fan) parts.Add($"вентиляторы {fan:0}%");
-        SensorText = parts.Count == 0 ? "" : "Датчики: " + string.Join(" · ", parts);
+        if (sn?.GpuTemp is double gt) parts.Add(sn.GpuHotspot is double hs ? Lang.T($"{gt:0} °C (горячая точка {hs:0} °C)", $"{gt:0} °C (hotspot {hs:0} °C)") : $"{gt:0} °C");
+        if (sn?.GpuPower is double gp) parts.Add(Lang.T($"{gp:0} Вт", $"{gp:0} W"));
+        if (sn?.GpuClockMHz is double gc) parts.Add(Lang.T($"{gc:0} МГц", $"{gc:0} MHz"));
+        if (sn?.GpuFanPercent is double fan) parts.Add(Lang.T($"вентиляторы {fan:0}%", $"fans {fan:0}%"));
+        SensorText = parts.Count == 0 ? "" : Lang.T("Датчики: ", "Sensors: ") + string.Join(" · ", parts);
 
         var v = f.Verdicts.FirstOrDefault(x => x.Area == "gpu");
         Verdict = v?.Title ?? "";
@@ -654,7 +671,7 @@ public sealed class NetworkViewModel : PageViewModel
             vm.Description = a.Description;
             vm.Rx = Ru.Bits(a.ReceiveBps);
             vm.Tx = Ru.Bits(a.SendBps);
-            vm.Speed = a.SpeedBitsPerSec > 0 ? "скорость подключения " + Ru.Bits(a.SpeedBitsPerSec / 8.0) : "";
+            vm.Speed = a.SpeedBitsPerSec > 0 ? Lang.T("скорость подключения ", "link speed ") + Ru.Bits(a.SpeedBitsPerSec / 8.0) : "";
             if (f.History.Adapters.TryGetValue(a.Id, out var h))
             {
                 vm.RxChart = HistorySnapshot.Tail(h.Rx, 120);

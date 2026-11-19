@@ -11,6 +11,7 @@ using WinPulse.Collectors.Diagnostics;
 using WinPulse.Core.Analysis;
 using WinPulse.Core.Diagnostics;
 using WinPulse.Core.Formatting;
+using WinPulse.Core;
 
 namespace WinPulse.App.ViewModels;
 
@@ -36,7 +37,7 @@ public sealed class FindingActionVm
         catch (Exception ex)
         {
             Log.Error("finding-action " + action.Command, ex);
-            Dialogs.MessageDialog.Show(action.Label, "Не удалось открыть: " + ex.Message);
+            Dialogs.MessageDialog.Show(action.Label, Lang.T("Не удалось открыть: ", "Couldn't open: ") + ex.Message);
         }
     }
 }
@@ -61,24 +62,26 @@ public sealed class FindingVm : ObservableObject
         };
         LevelText = f.Severity switch
         {
-            Severity.Critical => "Серьёзно",
-            Severity.Warning => "Стоит разобраться",
-            Severity.Info => "К сведению",
-            _ => "В порядке",
+            Severity.Critical => Lang.T("Серьёзно", "Serious"),
+            Severity.Warning => Lang.T("Стоит разобраться", "Worth a look"),
+            Severity.Info => Lang.T("К сведению", "For your information"),
+            _ => Lang.T("В порядке", "OK"),
         };
 
         var counts = new List<string>();
         if (f.Count30 > 0 && f.Severity != Severity.Ok)
         {
-            counts.Add(f.Count7 > 0 ? $"{Ru.Count(f.Count7, "раз", "раза", "раз")} за неделю" : "на этой неделе не было");
-            counts.Add($"всего {f.Count30}");
+            counts.Add(f.Count7 > 0
+                ? Lang.T($"{Ru.Count(f.Count7, "раз", "раза", "раз")} за неделю", $"{Ru.Count(f.Count7, "", "", "", "time", "times")} this week")
+                : Lang.T("на этой неделе не было", "none this week"));
+            counts.Add(Lang.T($"всего {f.Count30}", $"{f.Count30} in total"));
         }
-        if (f.LastSeen is DateTime last) counts.Add("последний раз " + When(last));
+        if (f.LastSeen is DateTime last) counts.Add(Lang.T("последний раз ", "last time ") + When(last));
         CountText = string.Join(" · ", counts);
 
         Advice = f.Advice.Select((a, i) => $"{i + 1}. {a}").ToList();
         var evidence = f.Evidence.Take(15).Select(e => e.When is DateTime w ? $"{w:dd.MM HH:mm}  {e.Text}" : e.Text).ToList();
-        if (f.Evidence.Count > 15) evidence.Add($"…и ещё {f.Evidence.Count - 15}");
+        if (f.Evidence.Count > 15) evidence.Add(Lang.T($"…и ещё {f.Evidence.Count - 15}", $"…and {f.Evidence.Count - 15} more"));
         Evidence = evidence;
         Technical = f.Technical;
         Actions = f.Actions.Select(a => new FindingActionVm(a)).ToList();
@@ -107,8 +110,8 @@ public sealed class FindingVm : ObservableObject
     private static string When(DateTime t)
     {
         var today = DateTime.Today;
-        if (t.Date == today) return $"сегодня в {t:HH:mm}";
-        if (t.Date == today.AddDays(-1)) return $"вчера в {t:HH:mm}";
+        if (t.Date == today) return Lang.T($"сегодня в {t:HH:mm}", $"today at {t:HH:mm}");
+        if (t.Date == today.AddDays(-1)) return Lang.T($"вчера в {t:HH:mm}", $"yesterday at {t:HH:mm}");
         return t.ToString("d MMMM", Ru.Culture);
     }
 }
@@ -118,7 +121,7 @@ public sealed class ProblemsViewModel : PageViewModel
 {
     private bool _isBusy;
     private string _busyText = "";
-    private string _summary = "Проверка ещё не запускалась.";
+    private string _summary = Lang.T("Проверка ещё не запускалась.", "The check hasn't run yet.");
     private string _lastScan = "";
     private bool _showPassed;
     private IReadOnlyList<DayBucket> _days = [];
@@ -132,7 +135,7 @@ public sealed class ProblemsViewModel : PageViewModel
         ScanCommand = new AsyncCommand(ScanAsync, () => !IsBusy);
         SaveReportCommand = new AsyncCommand(SaveReportAsync, () => !IsBusy && _report is not null);
         TogglePassedCommand = new RelayCommand(() => ShowPassed = !ShowPassed);
-        OpenReliabilityCommand = new FindingActionVm(new FindingAction("Монитор стабильности", "perfmon.exe", "/rel")).Command;
+        OpenReliabilityCommand = new FindingActionVm(new FindingAction(Lang.T("Монитор стабильности", "Reliability Monitor"), "perfmon.exe", "/rel")).Command;
     }
 
     public override string Key => "problems";
@@ -175,8 +178,8 @@ public sealed class ProblemsViewModel : PageViewModel
     }
 
     public string PassedToggleText => _showPassed
-        ? "Скрыть пройденные проверки"
-        : $"Показать пройденные проверки ({Passed.Count})";
+        ? Lang.T("Скрыть пройденные проверки", "Hide passed checks")
+        : Lang.T($"Показать пройденные проверки ({Passed.Count})", $"Show passed checks ({Passed.Count})");
 
     public override void OnShown()
     {
@@ -187,7 +190,7 @@ public sealed class ProblemsViewModel : PageViewModel
     {
         if (IsBusy) return;
         IsBusy = true;
-        BusyText = "Собираю данные…";
+        BusyText = Lang.T("Собираю данные…", "Collecting data…");
         try
         {
             var report = await Task.Run(() =>
@@ -200,7 +203,7 @@ public sealed class ProblemsViewModel : PageViewModel
         catch (Exception ex)
         {
             Log.Error("problems-scan", ex);
-            Summary = "Проверка не удалась: " + ex.Message;
+            Summary = Lang.T("Проверка не удалась: ", "The check failed: ") + ex.Message;
         }
         finally
         {
@@ -218,21 +221,22 @@ public sealed class ProblemsViewModel : PageViewModel
         foreach (var f in r.Passed) Passed.Add(new FindingVm(f));
         Days = r.Days;
         Notes = r.Notes;
-        LastScan = $"Проверено {r.ScannedAt:dd.MM.yyyy HH:mm} · журналы за {Ru.Count(r.PeriodDays, "день", "дня", "дней")}";
+        LastScan = Lang.T($"Проверено {r.ScannedAt:dd.MM.yyyy HH:mm} · журналы за {Ru.Count(r.PeriodDays, "день", "дня", "дней")}",
+            $"Checked {r.ScannedAt:dd.MM.yyyy HH:mm} · logs for {Ru.Count(r.PeriodDays, "", "", "", "day", "days")}");
 
         int critical = r.CriticalCount, warnings = r.WarningCount, info = r.InfoCount;
         Summary = critical + warnings + info == 0
-            ? "Проблем не найдено"
+            ? Lang.T("Проблем не найдено", "No problems found")
             : string.Join(" · ", new[]
             {
-                critical > 0 ? $"серьёзных: {critical}" : null,
-                warnings > 0 ? $"стоит разобраться: {warnings}" : null,
-                info > 0 ? $"к сведению: {info}" : null,
+                critical > 0 ? Lang.T($"серьёзных: {critical}", $"serious: {critical}") : null,
+                warnings > 0 ? Lang.T($"стоит разобраться: {warnings}", $"worth a look: {warnings}") : null,
+                info > 0 ? Lang.T($"к сведению: {info}", $"FYI: {info}") : null,
             }.Where(s => s is not null));
         Summary = char.ToUpper(Summary[0], Ru.Culture) + Summary[1..];
 
         int crit = r.Days.Sum(d => d.Critical), err = r.Days.Sum(d => d.Errors), warn = r.Days.Sum(d => d.Warnings);
-        TimelineText = $"Критичных событий: {crit} · ошибок: {err} · предупреждений: {warn}";
+        TimelineText = Lang.T($"Критичных событий: {crit} · ошибок: {err} · предупреждений: {warn}", $"Critical events: {crit} · errors: {err} · warnings: {warn}");
 
         OnPropertyChanged(nameof(HasProblems));
         OnPropertyChanged(nameof(NoProblems));
@@ -247,7 +251,7 @@ public sealed class ProblemsViewModel : PageViewModel
         if (report is null) return;
         string text = await Task.Run(() => BuildReport(report));
         string dir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        string path = Path.Combine(dir, $"WinPulse-отчёт-{DateTime.Now:yyyyMMdd-HHmm}.md");
+        string path = Path.Combine(dir, Lang.T($"WinPulse-отчёт-{DateTime.Now:yyyyMMdd-HHmm}.md", $"WinPulse-report-{DateTime.Now:yyyyMMdd-HHmm}.md"));
         await File.WriteAllTextAsync(path, text, Encoding.UTF8);
         try
         {
@@ -264,23 +268,27 @@ public sealed class ProblemsViewModel : PageViewModel
         var sb = new StringBuilder();
         var os = OsInfo.Read();
         var sys = OsInfo.ReadSystemInfo();
-        sb.AppendLine("# Отчёт WinPulse");
+        sb.AppendLine(Lang.T("# Отчёт WinPulse", "# WinPulse report"));
         sb.AppendLine();
-        sb.AppendLine($"Создан: {DateTime.Now:dd.MM.yyyy HH:mm} · журналы за {r.PeriodDays} дн.");
+        sb.AppendLine(Lang.T($"Создан: {DateTime.Now:dd.MM.yyyy HH:mm} · журналы за {r.PeriodDays} дн.", $"Created: {DateTime.Now:dd.MM.yyyy HH:mm} · logs for {r.PeriodDays} days"));
         sb.AppendLine();
-        sb.AppendLine("## Система");
-        sb.AppendLine($"- {os.Display}, сборка {os.BuildText} ({os.Edition})");
-        sb.AppendLine($"- Процессор: {sys.CpuName}, логических процессоров: {sys.LogicalCores}");
-        sb.AppendLine($"- Память: {Ru.Bytes(sys.InstalledMemory)}");
+        sb.AppendLine(Lang.T("## Система", "## System"));
+        sb.AppendLine(Lang.T($"- {os.Display}, сборка {os.BuildText} ({os.Edition})", $"- {os.Display}, build {os.BuildText} ({os.Edition})"));
+        sb.AppendLine(Lang.T($"- Процессор: {sys.CpuName}, логических процессоров: {sys.LogicalCores}", $"- CPU: {sys.CpuName}, logical processors: {sys.LogicalCores}"));
+        sb.AppendLine(Lang.T($"- Память: {Ru.Bytes(sys.InstalledMemory)}", $"- Memory: {Ru.Bytes(sys.InstalledMemory)}"));
         foreach (var g in Dxgi.Enumerate().Where(g => !g.IsSoftware))
-            sb.AppendLine($"- Видеокарта: {g.Name}, видеопамять {Ru.Bytes(g.DedicatedMemory)}");
+            sb.AppendLine(Lang.T($"- Видеокарта: {g.Name}, видеопамять {Ru.Bytes(g.DedicatedMemory)}", $"- GPU: {g.Name}, video memory {Ru.Bytes(g.DedicatedMemory)}"));
         foreach (var m in Displays.Enumerate())
-            sb.AppendLine($"- Монитор: {m.FriendlyName}{(m.IsPrimary ? " (основной)" : "")}, {m.Width}×{m.Height}, {m.RefreshHz} Гц (макс. {m.MaxRefreshHz}), масштаб {m.ScalePercent}%, VRR: {m.Vrr}");
-        sb.AppendLine($"- WinPulse запущен {(OsInfo.IsElevated() ? "от имени администратора" : "с обычными правами")}");
+            {
+            string primary = m.IsPrimary ? Lang.T(" (основной)", " (primary)") : "";
+            sb.AppendLine(Lang.T($"- Монитор: {m.FriendlyName}{primary}, {m.Width}×{m.Height}, {m.RefreshHz} Гц (макс. {m.MaxRefreshHz}), масштаб {m.ScalePercent}%, VRR: {m.Vrr}",
+                $"- Monitor: {m.FriendlyName}{primary}, {m.Width}×{m.Height}, {m.RefreshHz} Hz (max {m.MaxRefreshHz}), scale {m.ScalePercent}%, VRR: {m.Vrr}"));
+        }
+        sb.AppendLine(OsInfo.IsElevated() ? Lang.T("- WinPulse запущен от имени администратора", "- WinPulse runs as administrator") : Lang.T("- WinPulse запущен с обычными правами", "- WinPulse runs with standard rights"));
         sb.AppendLine();
 
-        sb.AppendLine("## Найденные проблемы");
-        if (r.Problems.Count == 0) sb.AppendLine("Не найдено.");
+        sb.AppendLine(Lang.T("## Найденные проблемы", "## Problems found"));
+        if (r.Problems.Count == 0) sb.AppendLine(Lang.T("Не найдено.", "None."));
         foreach (var f in r.Problems)
         {
             sb.AppendLine();
@@ -289,25 +297,25 @@ public sealed class ProblemsViewModel : PageViewModel
             if (f.Advice.Count > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine("Что делать:");
+                sb.AppendLine(Lang.T("Что делать:", "What to do:"));
                 foreach (var a in f.Advice) sb.AppendLine("- " + a);
             }
             if (f.Evidence.Count > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine("Записи:");
+                sb.AppendLine(Lang.T("Записи:", "Entries:"));
                 foreach (var e in f.Evidence.Take(20))
                     sb.AppendLine("- " + (e.When is DateTime w ? $"{w:dd.MM HH:mm} " : "") + e.Text);
             }
-            if (f.Technical is not null) sb.AppendLine("\nТехнически: " + f.Technical.Replace("\n", "; "));
+            if (f.Technical is not null) sb.AppendLine(Lang.T("\nТехнически: ", "\nTechnical: ") + f.Technical.Replace("\n", "; "));
         }
         sb.AppendLine();
-        sb.AppendLine("## Пройденные проверки");
+        sb.AppendLine(Lang.T("## Пройденные проверки", "## Passed checks"));
         foreach (var f in r.Passed) sb.AppendLine($"- {f.Title}");
         if (r.Notes.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("## Заметки");
+            sb.AppendLine(Lang.T("## Заметки", "## Notes"));
             foreach (var n in r.Notes) sb.AppendLine("- " + n);
         }
         return sb.ToString();

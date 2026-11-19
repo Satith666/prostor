@@ -21,33 +21,33 @@ public static class DiagnosticsCollector
             string xpath = $"*[System[{filter} and {EventLogReader.LastDays(periodDays)}]]";
             var r = EventLogReader.Query(channel, xpath, max);
             if (r.Error != 0 && r.Error != EventLogReader.ERROR_EVT_CHANNEL_NOT_FOUND)
-                errors.Add($"Не удалось прочитать {what} (код {r.Error}).");
+                errors.Add(Lang.T($"Не удалось прочитать {what} (код {r.Error}).", $"Couldn't read {what} (code {r.Error})."));
             events.AddRange(r.Items);
         }
 
-        progress?.Invoke("Читаю системный журнал…");
-        Read("System", "Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=41)", "записи о внезапных выключениях", days, 500);
-        Read("System", "Provider[@Name='EventLog'] and (EventID=6008)", "записи о неожиданных завершениях", days, 500);
-        Read("System", "Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] and (EventID=1001)", "записи о синих экранах", days, 500);
-        Read("System", "Provider[@Name='Display'] and (EventID=4101)", "записи о сбросах видеодрайвера", days, 500);
-        Read("System", "Provider[@Name='Microsoft-Windows-WHEA-Logger']", "аппаратные ошибки WHEA", days, 500);
+        progress?.Invoke(Lang.T("Читаю системный журнал…", "Reading the System log…"));
+        Read("System", "Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=41)", Lang.T("записи о внезапных выключениях", "sudden shutdown records"), days, 500);
+        Read("System", "Provider[@Name='EventLog'] and (EventID=6008)", Lang.T("записи о неожиданных завершениях", "unexpected shutdown records"), days, 500);
+        Read("System", "Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] and (EventID=1001)", Lang.T("записи о синих экранах", "blue screen records"), days, 500);
+        Read("System", "Provider[@Name='Display'] and (EventID=4101)", Lang.T("записи о сбросах видеодрайвера", "graphics driver reset records"), days, 500);
+        Read("System", "Provider[@Name='Microsoft-Windows-WHEA-Logger']", Lang.T("аппаратные ошибки WHEA", "WHEA hardware errors"), days, 500);
         Read("System",
             "(Provider[@Name='disk'] or Provider[@Name='Ntfs'] or Provider[@Name='Microsoft-Windows-Ntfs'] or Provider[@Name='stornvme'] " +
             "or Provider[@Name='storahci'] or Provider[@Name='iaStorAC'] or Provider[@Name='iaStorA'] or Provider[@Name='iaStorAVC'] or Provider[@Name='nvme']) " +
             "and (Level=1 or Level=2 or Level=3)",
-            "ошибки дисков", days, 500);
+            Lang.T("ошибки дисков", "disk errors"), days, 500);
         Read("System", "Provider[@Name='Service Control Manager'] and (EventID=7000 or EventID=7009 or EventID=7023 or EventID=7031 or EventID=7034)",
-            "сбои служб", days, 500);
-        Read("System", "Provider[@Name='Microsoft-Windows-WindowsUpdateClient'] and (EventID=19 or EventID=20)", "журнал обновлений", days, 1000);
-        Read("System", "Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and (EventID=37)", "ограничения частоты процессора", days, 500);
-        Read("System", "Provider[@Name='Microsoft-Windows-MemoryDiagnostics-Results'] and (EventID=1101 or EventID=1102)", "результаты проверки памяти", 365, 20);
+            Lang.T("сбои служб", "service failures"), days, 500);
+        Read("System", "Provider[@Name='Microsoft-Windows-WindowsUpdateClient'] and (EventID=19 or EventID=20)", Lang.T("журнал обновлений", "the update log"), days, 1000);
+        Read("System", "Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and (EventID=37)", Lang.T("ограничения частоты процессора", "CPU clock limits"), days, 500);
+        Read("System", "Provider[@Name='Microsoft-Windows-MemoryDiagnostics-Results'] and (EventID=1101 or EventID=1102)", Lang.T("результаты проверки памяти", "memory test results"), 365, 20);
 
-        progress?.Invoke("Читаю журнал программ…");
-        Read("Application", "Provider[@Name='Application Error'] and (EventID=1000)", "падения программ", days, 1000);
-        Read("Application", "Provider[@Name='Application Hang'] and (EventID=1002)", "зависания программ", days, 500);
-        Read("Application", "Provider[@Name='.NET Runtime'] and (EventID=1026)", "ошибки программ .NET", days, 300);
+        progress?.Invoke(Lang.T("Читаю журнал программ…", "Reading the Application log…"));
+        Read("Application", "Provider[@Name='Application Error'] and (EventID=1000)", Lang.T("падения программ", "program crashes"), days, 1000);
+        Read("Application", "Provider[@Name='Application Hang'] and (EventID=1002)", Lang.T("зависания программ", "program hangs"), days, 500);
+        Read("Application", "Provider[@Name='.NET Runtime'] and (EventID=1026)", Lang.T("ошибки программ .NET", ".NET program errors"), days, 300);
 
-        progress?.Invoke("Читаю журнал загрузки…");
+        progress?.Invoke(Lang.T("Читаю журнал загрузки…", "Reading the boot log…"));
         var boot = EventLogReader.Query(BootChannel,
             $"*[System[(EventID=100 or EventID=101 or EventID=102 or EventID=103 or EventID=106 or EventID=109) and {EventLogReader.LastDays(60)}]]", 300);
         if (boot.Error == EventLogReader.ERROR_ACCESS_DENIED) bootDenied = true;
@@ -57,13 +57,13 @@ public static class DiagnosticsCollector
             events.AddRange(boot.Items);
         }
 
-        progress?.Invoke("Проверяю устройства…");
+        progress?.Invoke(Lang.T("Проверяю устройства…", "Checking devices…"));
         var devices = DeviceProblemsReader.Read();
 
-        progress?.Invoke("Проверяю здоровье дисков…");
+        progress?.Invoke(Lang.T("Проверяю здоровье дисков…", "Checking disk health…"));
         var health = DiskHealthReader.Read();
 
-        progress?.Invoke("Проверяю состояние системы…");
+        progress?.Invoke(Lang.T("Проверяю состояние системы…", "Checking system state…"));
         var status = new MEMORYSTATUSEX { dwLength = 64 };
         Native.GlobalMemoryStatusEx(ref status);
 

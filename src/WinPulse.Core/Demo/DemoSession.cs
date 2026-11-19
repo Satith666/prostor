@@ -33,7 +33,7 @@ public static class DemoSession
                 new() { Name = "Discord", Cpu = 1.2 + rnd.NextDouble() * 0.6, Gpu = 1.5, Memory = 480L << 20 },
             };
             if (chromeVideo) others.Add(new SessionApp { Name = "Google Chrome", Cpu = 6 + rnd.NextDouble() * 2, Gpu = 4, Memory = 1900L << 20 });
-            if (update) others.Add(new SessionApp { Name = "Установщик модулей Windows", Cpu = 24 + rnd.NextDouble() * 6, Gpu = 0, Io = 45_000_000 });
+            if (update) others.Add(new SessionApp { Name = Lang.T("Установщик модулей Windows", "Windows Modules Installer"), Cpu = 24 + rnd.NextDouble() * 6, Gpu = 0, Io = 45_000_000 });
 
             record.Samples.Add(new SessionSample
             {
