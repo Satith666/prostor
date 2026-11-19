@@ -1641,63 +1641,259 @@ async function loadPrograms() {
   S.pr.loading = false;
   rerender('programs');
 }
-function filterPrograms() {
-  const q = (S.pr.q || '').trim().toLowerCase();
+// Удаление программ: тихо, если программа это умеет, по одной или списком.
+// Потом выбор остатков: то, что точно принадлежало программе, отмечено заранее.
+const LEFT_KIND = { folder: 'Папка', registry: 'Реестр', service: 'Служба', task: 'Задание', shortcut: 'Ярлык' };
+const nProgs = (n) => fmtNum(n) + ' ' + plural(n, 'программа', 'программы', 'программ');
+
+function confirmUninstall(list) {
+  return new Promise((resolve) => {
+    const one = list.length === 1;
+    const total = sum(list, (x) => x.size || 0);
+    const rows = list.slice(0, 8).map((x) => `<li><span>${esc(x.name)}</span><span>${x.size ? fmtSize(x.size) : ''}</span></li>`).join('');
+    const d = openDialog(`<h2>${one ? `Удалить «${esc(list[0].name)}»?` : `Удалить ${fmtNum(list.length)} ${plural(list.length, 'программу', 'программы', 'программ')}?`}</h2>
+      <p>${one ? 'Запустится деинсталлятор программы.' : 'Программы удаляются по очереди.'} Затем Prostor покажет, что ${one ? 'от неё' : 'от них'} осталось: папки, записи реестра, службы, задания и ярлыки.${total ? ` Освободится около ${fmtSize(total)}.` : ''}</p>
+      ${one ? '' : `<ul class="reslist">${rows}</ul>${list.length > 8 ? `<p class="small faint">И ещё ${list.length - 8}</p>` : ''}`}
+      <label class="opt"><input type="checkbox" class="ck" id="unQuiet" checked><span>Удалить тихо, без окон и вопросов<small>Если программа так не умеет, откроется её обычный деинсталлятор.</small></span></label>
+      <div class="btns"><button class="btn" data-v="0">Отмена</button><button class="btn primary" data-v="1">${ic('trash')}Удалить</button></div>`, { onClose: resolve });
+    $$('.btns button', d.el).forEach((b) => { b.onclick = () => d.close(b.dataset.v === '1' ? { quiet: $('#unQuiet', d.el).checked } : null); });
+  });
+}
+
+async function uninstallPrograms(list) {
+  const opt = await confirmUninstall(list);
+  if (!opt) return;
+  const d = openDialog(`<h2 id="unTitle"></h2><p id="unPhase">Подготовка…</p>
+    <div class="prog indet" style="margin:18px 0 4px"><i></i></div>
+    <div class="btns"><button class="btn" id="unStop">${ic('stop')}Остановить</button><button class="btn primary" id="unGo" hidden>Деинсталлятор закрыт</button></div>`, { sticky: true });
+  let stop = false;
+  $('#unStop', d.el).onclick = (e) => { stop = true; e.currentTarget.disabled = true; cancelJob('uninstall'); };
+  $('#unGo', d.el).onclick = (e) => { e.currentTarget.disabled = true; api('/api/programs/continue', {}).catch(() => {}); };
+  dialogHooks.uninstall = (s) => {
+    const ph = $('#unPhase', d.el); if (ph && s.phase) ph.textContent = s.phase;
+    const go = $('#unGo', d.el); if (go) go.hidden = !(s.running && s.current === 'interactive');
+  };
+  const reports = [];
+  for (let i = 0; i < list.length && !stop; i++) {
+    const x = list[i];
+    $('#unTitle', d.el).textContent = list.length > 1 ? `Удаление ${i + 1} из ${list.length}: ${x.name}` : `Удаление «${x.name}»`;
+    $('#unPhase', d.el).textContent = 'Подготовка…';
+    const go = $('#unGo', d.el); go.hidden = true; go.disabled = false;
+    try {
+      const s = await startJob('uninstall', '/api/programs/uninstall', { key: x.key, quiet: opt.quiet });
+      reports.push(s.err ? { name: x.name, key: x.key, error: s.err } : s.result || { name: x.name, key: x.key, error: 'нет ответа' });
+    } catch (e) { reports.push({ name: x.name, key: x.key, error: e.message }); }
+  }
+  delete dialogHooks.uninstall;
+  d.close();
+  if (S.pr) { S.pr.list = null; S.pr.sel = new Set(); }
+  refreshInfo().then(() => rerender('programs'));
+  showLeftovers(reports);
+}
+
+function showLeftovers(reports) {
+  const done = reports.filter((r) => r.removed);
+  const notDone = reports.filter((r) => !r.removed);
+  const items = done.flatMap((r) => (r.leftovers || []).map((l) => Object.assign({ key: r.key, prog: r.name, uid: r.key + '|' + l.id }, l)));
+  const sel = new Set(items.filter((l) => l.sure === 'high').map((l) => l.uid));
+  const many = done.length > 1;
+  const failNote = notDone.length ? note('warn', (done.length ? 'Не удалены: ' : '') + notDone.map((r) => `<b>${esc(r.name)}</b> — ${esc(r.error || r.note || 'программа осталась в списке')}`).join('; ') + '.', !done.length) : '';
+  if (!done.length) {
+    info(reports.length > 1 ? 'Программы не удалены' : 'Программа не удалена', failNote);
+    return;
+  }
+  const title = many ? `Удалено: ${nProgs(done.length)}` : `«${done[0].name}» удалена`;
+  if (!items.length) {
+    info(title, `<p>${many ? 'После них' : 'После неё'} не осталось ни папок, ни записей в реестре, ни служб, ни ярлыков.</p>${failNote}`);
+    return;
+  }
+  const row = (l) => `<label class="left-row"><input type="checkbox" class="ck" data-uid="${esc(l.uid)}" ${sel.has(l.uid) ? 'checked' : ''}>
+      <span class="k">${LEFT_KIND[l.kind] || l.kind}</span><span class="p"><span class="pp" title="${esc(l.path)}">${ltr(l.path)}</span><small>${esc(l.why)}${l.sure === 'high' ? '' : '. Проверьте, прежде чем удалять'}</small></span><b>${l.size ? fmtSize(l.size) : ''}</b></label>`;
+  const groups = done.filter((r) => (r.leftovers || []).length).map((r) => `${many ? `<h3>${esc(r.name)}</h3>` : ''}${items.filter((l) => l.key === r.key).map(row).join('')}`).join('');
+  const days = qDays() > 0 ? qDays() : 7;
+  const d = openDialog(`<h2>${esc(title)}</h2>
+    <p>Осталось ${nItems(items.length)}. Отмеченное точно принадлежало ${many ? 'удалённым программам' : 'удалённой программе'}, остальное посмотрите сами.</p>${failNote}
+    <div class="left-list">${groups}</div>
+    <p class="small faint">Папки и ярлыки уйдут в карантин на ${days} ${plural(days, 'день', 'дня', 'дней')}, удалённые ключи реестра сохранятся в файл .reg.</p>
+    <div class="btns"><button class="btn" data-v="0">Оставить всё</button><button class="btn primary" data-v="1" id="lfGo"></button></div>`, { wide: true });
+  const sync = () => {
+    const n = sel.size, size = sum(items.filter((l) => sel.has(l.uid)), (l) => l.size || 0);
+    const b = $('#lfGo', d.el);
+    b.disabled = !n;
+    b.innerHTML = `${ic('trash')}Убрать ${n ? nItems(n) : ''}${size ? ', ' + fmtSize(size) : ''}`;
+  };
+  $$('.left-row .ck', d.el).forEach((c) => { c.onchange = () => { if (c.checked) sel.add(c.dataset.uid); else sel.delete(c.dataset.uid); sync(); }; });
+  sync();
+  $('.btns [data-v="0"]', d.el).onclick = () => d.close();
+  $('#lfGo', d.el).onclick = async (e) => {
+    e.currentTarget.disabled = true;
+    const tot = { removed: 0, freed: 0, failed: [], backups: [] };
+    for (const r of done) {
+      const ids = items.filter((l) => l.key === r.key && sel.has(l.uid)).map((l) => l.id);
+      if (!ids.length) continue;
+      try {
+        const x = await api('/api/programs/leftovers', { key: r.key, ids });
+        tot.removed += x.removed; tot.freed += x.freed; tot.failed.push(...(x.failed || []));
+        if (x.backup) tot.backups.push(x.backup);
+      } catch (err) { tot.failed.push(r.name + ': ' + err.message); }
+    }
+    d.close();
+    refreshInfo();
+    const msg = `Убрано ${nItems(tot.removed)}${tot.freed ? `, освобождено ${fmtSize(tot.freed)}` : ''}`;
+    if (tot.failed.length) {
+      info('Убрано не всё', `<p>${msg}. Не получилось убрать:</p><ul class="reslist">${tot.failed.slice(0, 10).map((f) => `<li><span class="path" title="${esc(f)}">${ltr(f)}</span></li>`).join('')}</ul>
+        <p class="small faint">Обычно это файлы, которые держит запущенная программа, или записи, для которых нужны права администратора.</p>`);
+    } else if (tot.backups.length) toastAction(msg, 'Копия реестра', () => api('/api/fs/reveal', { path: tot.backups[0] }));
+    else toast(msg);
+  };
+}
+
+// ---- приложения Microsoft Store
+async function loadApps() {
+  try {
+    const r = await api('/api/apps');
+    S.apps = { list: r.apps || [], admin: r.admin, sel: new Set(), q: (S.apps && S.apps.q) || '' };
+  } catch (e) { toast(e.message, true); S.apps = { list: [], sel: new Set(), q: '' }; }
+  rerender('programs');
+}
+
+async function removeApps(list) {
+  const a = S.apps;
+  const one = list.length === 1;
+  const total = sum(list, (x) => x.size + x.data);
+  const d0 = await new Promise((resolve) => {
+    const d = openDialog(`<h2>${one ? `Удалить «${esc(list[0].name)}»?` : `Удалить ${fmtNum(list.length)} ${plural(list.length, 'приложение', 'приложения', 'приложений')}?`}</h2>
+      <p>Приложение удаляется вместе со своими данными и настройками${total ? `, освободится около ${fmtSize(total)}` : ''}. Вернуть его можно из Microsoft Store.</p>
+      ${one ? '' : `<ul class="reslist">${list.slice(0, 8).map((x) => `<li><span>${esc(x.name)}</span><span>${fmtSize(x.size + x.data)}</span></li>`).join('')}</ul>`}
+      ${a.admin ? `<label class="opt"><input type="checkbox" class="ck" id="apProv"><span>Не ставить и новым пользователям<small>Windows не будет устанавливать ${one ? 'это приложение' : 'эти приложения'} при создании новых учётных записей.</small></span></label>` : ''}
+      <div class="btns"><button class="btn" data-v="0">Отмена</button><button class="btn primary" data-v="1">${ic('trash')}Удалить</button></div>`, { onClose: resolve });
+    $$('.btns button', d.el).forEach((b) => { b.onclick = () => d.close(b.dataset.v === '1' ? { prov: !!($('#apProv', d.el) || {}).checked } : null); });
+  });
+  if (!d0) return;
+  const d = openDialog(`<h2 id="apTitle"></h2><div class="prog indet" style="margin:18px 0 4px"><i></i></div>`, { sticky: true });
+  const failed = [];
+  let freed = 0;
+  for (let i = 0; i < list.length; i++) {
+    const x = list[i];
+    $('#apTitle', d.el).textContent = list.length > 1 ? `Удаление ${i + 1} из ${list.length}: ${x.name}` : `Удаление «${x.name}»`;
+    try { await api('/api/apps/remove', { full: x.full, provisioned: d0.prov }); freed += x.size + x.data; } catch (e) { failed.push(`<b>${esc(x.name)}</b>: ${esc(e.message)}`); }
+  }
+  d.close();
+  S.apps = null;
+  refreshInfo();
+  rerender('programs');
+  if (failed.length) info('Удалено не всё', `<p>${failed.join('<br>')}</p>`);
+  else toast(`${one ? 'Приложение удалено' : 'Приложения удалены'}, освобождено около ${fmtSize(freed)}`);
+}
+
+const prTabsHTML = () => `<div class="seg" style="margin-bottom:22px">${[['win', 'Программы'], ['store', 'Приложения Microsoft Store']].map(([v, n]) => `<button class="${(S.prTab || 'win') === v ? 'on' : ''}" data-act="prTab" data-v="${v}">${n}</button>`).join('')}</div>`;
+const prTabAct = (el) => { S.prTab = el.dataset.v; render(false); };
+
+function selBar(n, size, what) {
+  return n ? `<div class="sum"><b>${fmtSize(size)}</b><span>выбрано: ${what}</span></div><span class="grow"></span>
+    <button class="btn" data-act="selNone">Снять выбор</button><button class="btn primary lg" data-act="removeSel">${ic('trash')}Удалить выбранные</button>` : '';
+}
+
+function appsPage(m) {
+  const a = S.apps;
+  if (!a || !a.list) {
+    m.innerHTML = `<div class="page wide">${head('Программы', 'Читаем список приложений…')}${prTabsHTML()}<p class="skel">Загрузка…</p></div>`;
+    acts({ prTab: prTabAct });
+    if (!S.appsLoading) { S.appsLoading = true; loadApps().finally(() => { S.appsLoading = false; }); }
+    return;
+  }
+  const total = sum(a.list, (x) => x.size + x.data);
+  const rows = a.list.map((x) => `<tr data-s="${esc((x.name + ' ' + x.publisher + ' ' + x.id).toLowerCase())}">
+      <td class="w"><input type="checkbox" class="ck" data-act="apSel" data-k="${esc(x.full)}" ${a.sel.has(x.full) ? 'checked' : ''} aria-label="${esc(x.name)}"></td>
+      <td><div class="nm">${ic('program')}<div class="tx"><div>${esc(x.name)}</div><small>${esc([x.publisher, x.version].filter(Boolean).join(', '))}</small></div></div></td>
+      <td class="r w num">${fmtSize(x.size + x.data)}</td>
+      <td class="w small faint">${x.data > 1 << 20 ? 'данные ' + fmtSize(x.data) : ''}</td>
+      <td class="w"><div class="row-flex" style="gap:4px;justify-content:flex-end">${x.location ? `<button class="btn sm icon quiet" title="Открыть папку" data-act="open" data-path="${esc(x.location)}">${ic('folder')}</button>` : ''}
+        <button class="btn sm" data-act="apRemove" data-k="${esc(x.full)}">Удалить</button></div></td></tr>`).join('');
+  const bar = () => { const l = a.list.filter((x) => a.sel.has(x.full)); return selBar(l.length, sum(l, (x) => x.size + x.data), fmtNum(l.length) + ' ' + plural(l.length, 'приложение', 'приложения', 'приложений')); };
+  m.innerHTML = `<div class="page wide">${head('Программы', `${fmtNum(a.list.length)} ${plural(a.list.length, 'приложение', 'приложения', 'приложений')} из Microsoft Store занимают ${fmtSize(total)} вместе со своими данными. Встроенные части Windows здесь не показаны.`,
+    `<div class="search">${ic('search')}<input class="input" id="apq" placeholder="Найти приложение" value="${esc(a.q || '')}"></div>`)}
+    ${prTabsHTML()}
+    ${a.list.length ? `<table class="tbl"><thead><tr><th></th><th>Приложение</th><th class="r">Размер</th><th></th><th></th></tr></thead><tbody id="prBody">${rows}</tbody></table>` : '<p class="faint">Приложений из Microsoft Store, которые можно удалить, нет.</p>'}
+    <p class="faint" id="prEmpty" hidden style="padding:16px 0">Ничего не найдено</p>
+    <div class="actionbar" id="prBar" ${a.sel.size ? '' : 'hidden'}>${bar()}</div></div>`;
+  const inp = $('#apq');
+  inp.oninput = () => { a.q = inp.value; filterRows(a.q); };
+  filterRows(a.q);
+  const upd = () => { const b = $('#prBar'); b.innerHTML = bar(); b.hidden = !a.sel.size; };
+  acts({
+    prTab: prTabAct,
+    apSel: (el) => { if (el.checked) a.sel.add(el.dataset.k); else a.sel.delete(el.dataset.k); upd(); },
+    selNone: () => { a.sel.clear(); $$('#prBody .ck').forEach((c) => { c.checked = false; }); upd(); },
+    apRemove: (el) => removeApps(a.list.filter((x) => x.full === el.dataset.k)),
+    removeSel: () => removeApps(a.list.filter((x) => a.sel.has(x.full))),
+  });
+  ready(m);
+}
+
+function filterRows(q) {
+  q = (q || '').trim().toLowerCase();
   let shown = 0;
   for (const tr of $$('#prBody tr')) {
     const ok = !q || tr.dataset.s.includes(q);
     tr.hidden = !ok;
     if (ok) shown++;
   }
-  const e = $('#prEmpty'); if (e) e.hidden = shown > 0;
+  const e = $('#prEmpty'); if (e) e.hidden = shown > 0 || !$('#prBody');
 }
+
 PAGES.programs = (m) => {
+  if (S.prTab === 'store') return appsPage(m);
   const p = S.pr;
   if (!p || !p.list) {
     m.innerHTML = loadingPage('Читаем список программ…');
     if (!p || !p.loading) { S.pr = Object.assign(p || { q: '', sort: 'size', dir: -1 }, { loading: true }); loadPrograms(); }
     return;
   }
+  if (!p.sel) p.sel = new Set();
+  for (const k of [...p.sel]) if (!p.list.some((x) => x.key === k)) p.sel.delete(k);
   const key = { size: (x) => x.size, name: (x) => x.name.toLowerCase(), date: (x) => x.installDate || '' }[p.sort];
   const list = p.list.slice().sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0) * p.dir);
   const total = sum(p.list, (x) => x.size);
   const unknown = p.list.filter((x) => !x.size).length;
   const th = (id, name, cls = '') => `<th class="sort ${cls}" data-act="sort" data-s="${id}">${name}${p.sort === id ? (p.dir < 0 ? ' ↓' : ' ↑') : ''}</th>`;
   const rows = list.map((x) => `<tr data-s="${esc((x.name + ' ' + (x.publisher || '')).toLowerCase())}">
+      <td class="w"><input type="checkbox" class="ck" data-act="prSel" data-key="${esc(x.key)}" ${p.sel.has(x.key) ? 'checked' : ''} aria-label="${esc(x.name)}"></td>
       <td><div class="nm">${ic('program')}<div class="tx"><div>${esc(x.name)}</div><small>${esc([x.publisher, x.version].filter(Boolean).join(', '))}</small></div></div></td>
       <td class="r w num">${x.size ? (x.sizeSource === 'folder' ? '≈ ' : '') + fmtSize(x.size) : '<span class="faint">—</span>'}</td>
       <td class="w small faint">${x.installDate ? fmtDate(x.installDate) : ''}</td>
       <td class="w small faint">${x.scope === 'user' ? 'для меня' : 'для всех'}</td>
       <td class="w"><div class="row-flex" style="gap:4px;justify-content:flex-end">${x.location ? `<button class="btn sm icon quiet" title="Открыть папку" data-act="open" data-path="${esc(x.location)}">${ic('folder')}</button>` : ''}
         <button class="btn sm" data-act="uninstall" data-key="${esc(x.key)}">Удалить</button></div></td></tr>`).join('');
-  m.innerHTML = `<div class="page wide">${head('Программы', `${fmtNum(p.list.length)} ${plural(p.list.length, 'программа', 'программы', 'программ')} занимают ${fmtSize(total)}. Удаление ненужных программ обычно освобождает больше всего места.`,
+  const bar = () => { const l = p.list.filter((x) => p.sel.has(x.key)); return selBar(l.length, sum(l, (x) => x.size), nProgs(l.length)); };
+  m.innerHTML = `<div class="page wide">${head('Программы', `${nProgs(p.list.length)} занимают ${fmtSize(total)}. Удаление ненужных программ обычно освобождает больше всего места. Prostor удаляет программу вместе с тем, что она оставляет после себя.`,
     `<div class="search">${ic('search')}<input class="input" id="prq" placeholder="Найти программу" value="${esc(p.q || '')}"></div>
      <button class="btn" data-act="measure" ${p.measuring ? 'disabled' : ''}>${ic('analyze')}<span id="msInfo">${p.measuring ? 'Измеряем…' : 'Измерить размеры'}</span></button>`)}
+    ${prTabsHTML()}
     ${unknown && !p.measuring ? `<div class="banner">${ic('info')}<span>${unknown} ${plural(unknown, 'программа не сообщает', 'программы не сообщают', 'программ не сообщают')} свой размер. «Измерить размеры» посчитает объём их папок.</span></div>` : ''}
-    <table class="tbl"><thead><tr>${th('name', 'Программа')}${th('size', 'Размер', 'r')}${th('date', 'Установлена')}<th>Установка</th><th></th></tr></thead>
-    <tbody id="prBody">${rows}</tbody></table><p class="faint" id="prEmpty" hidden style="padding:16px 0">Ничего не найдено</p></div>`;
+    <table class="tbl"><thead><tr><th></th>${th('name', 'Программа')}${th('size', 'Размер', 'r')}${th('date', 'Установлена')}<th>Установка</th><th></th></tr></thead>
+    <tbody id="prBody">${rows}</tbody></table><p class="faint" id="prEmpty" hidden style="padding:16px 0">Ничего не найдено</p>
+    <div class="actionbar" id="prBar" ${p.sel.size ? '' : 'hidden'}>${bar()}</div></div>`;
   const inp = $('#prq');
-  inp.oninput = () => { p.q = inp.value; filterPrograms(); };
-  filterPrograms();
+  inp.oninput = () => { p.q = inp.value; filterRows(p.q); };
+  filterRows(p.q);
+  const upd = () => { const b = $('#prBar'); b.innerHTML = bar(); b.hidden = !p.sel.size; };
   acts({
+    prTab: prTabAct,
     sort: (el) => { const s = el.dataset.s; if (p.sort === s) p.dir = -p.dir; else { p.sort = s; p.dir = s === 'name' ? 1 : -1; } render(false); },
     measure: async () => {
       p.measuring = true; render(false);
       try { const s = await startJob('measure', '/api/programs/measure'); if (s.result) p.list = s.result; } catch (e) { toast(e.message, true); }
       p.measuring = false; rerender('programs');
     },
-    uninstall: async (el) => {
-      const x = p.list.find((y) => y.key === el.dataset.key);
-      if (!(await ask(`Удалить «${x.name}»?`, `<p>Запустится деинсталлятор программы, дальше следуйте его указаниям.${x.size ? ` Освободится около ${fmtSize(x.size)}.` : ''}</p>`, 'Запустить удаление'))) return;
-      try { await api('/api/programs/uninstall', { key: x.key }); toast('Деинсталлятор запущен'); S.prDirty = true; } catch (e) { toast(e.message, true); }
-    },
+    prSel: (el) => { if (el.checked) p.sel.add(el.dataset.key); else p.sel.delete(el.dataset.key); upd(); },
+    selNone: () => { p.sel.clear(); $$('#prBody .ck').forEach((c) => { c.checked = false; }); upd(); },
+    uninstall: (el) => uninstallPrograms(p.list.filter((y) => y.key === el.dataset.key)),
+    removeSel: () => uninstallPrograms(list.filter((x) => p.sel.has(x.key))),
   });
   pageHooks.measure = (s) => { const e = $('#msInfo'); if (e) e.textContent = `Измеряем ${s.done} из ${s.total}…`; };
   ready(m);
 };
-addEventListener('focus', () => {
-  if (S.prDirty && S.page === 'programs') { S.prDirty = false; S.pr.list = null; setTimeout(() => render(false), 600); }
-});
 
 // ============================================================ АВТОЗАГРУЗКА
 PAGES.startup = (m) => {

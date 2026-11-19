@@ -639,6 +639,27 @@ func routes() http.Handler {
 		}
 		writeJSON(w, res)
 	})
+	// Microsoft Store apps of the current user
+	get("/api/apps", func(w http.ResponseWriter, r *http.Request) {
+		list, err := listStoreApps()
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, map[string]any{"apps": list, "admin": isAdmin})
+	})
+	post("/api/apps/remove", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Full        string
+			Provisioned bool
+		}
+		readJSON(r, &req)
+		if err := removeStoreApp(req.Full, req.Provisioned && isAdmin); err != nil {
+			writeErr(w, errors.New("не удалось удалить: "+err.Error()))
+			return
+		}
+		ok(w)
+	})
 	get("/api/startup", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, listStartup()) })
 	post("/api/startup/toggle", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {

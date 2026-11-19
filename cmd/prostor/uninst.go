@@ -486,6 +486,7 @@ func runUninstaller(j *Job, s *progSnap, quiet bool) (ran, usedQuiet bool, note 
 		cmd = exec.Command(ue)
 		winapi.SetCmdLine(cmd, `"`+ue+`" `+ua)
 		j.SetPhase("Удаление «" + s.Name + "»: следуйте указаниям деинсталлятора")
+		j.SetCurrent("interactive") // the UI offers "the uninstaller is closed"
 	}
 	if err := cmd.Start(); err != nil {
 		return false, usedQuiet, note, err
