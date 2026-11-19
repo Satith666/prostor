@@ -119,6 +119,27 @@ public partial class App : Application
     private const int ShotWidth = 1320;
     private const int ShotHeight = 900;
 
+    private static void Save(FrameworkElement root, string path)
+    {
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(root);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file = File.Create(path);
+        encoder.Save(file);
+    }
+
+    private static IEnumerable<System.Windows.Controls.ScrollViewer> FindScrollers(DependencyObject parent)
+    {
+        int count = VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is System.Windows.Controls.ScrollViewer sv && sv.IsVisible) yield return sv;
+            foreach (var nested in FindScrollers(child)) yield return nested;
+        }
+    }
+
     private static async Task ScreenshotTourAsync(Window window, MainViewModel vm, string dir)
     {
         Directory.CreateDirectory(dir);
@@ -145,13 +166,24 @@ public partial class App : Application
                 bool slow = item.Key is "problems" or "drivers" or "startup" or "windowed" or "optimize";
                 await Task.Delay(slow ? 8000 : 3000);
                 Layout();
-                var bitmap = new RenderTargetBitmap((int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight), 96, 96, PixelFormats.Pbgra32);
-                bitmap.Render(root);
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                using var file = File.Create(Path.Combine(dir, $"{++n:00}-{item.Key}.png"));
-                encoder.Save(file);
+                string name = $"{++n:00}-{item.Key}";
+                Save(root, Path.Combine(dir, name + ".png"));
                 Mark(dir, "saved " + item.Key);
+
+                // Длинные страницы: прокручиваем и снимаем продолжение (до трёх экранов).
+                var scroller = FindScrollers(root).OrderByDescending(sv => sv.ExtentHeight).FirstOrDefault();
+                if (scroller is not null && scroller.ScrollableHeight > 40)
+                {
+                    for (int part = 2; part <= 4 && scroller.VerticalOffset < scroller.ScrollableHeight - 1; part++)
+                    {
+                        scroller.ScrollToVerticalOffset(scroller.VerticalOffset + scroller.ViewportHeight - 60);
+                        Layout();
+                        await Task.Delay(400);
+                        Layout();
+                        Save(root, Path.Combine(dir, $"{name}-{part}.png"));
+                    }
+                    scroller.ScrollToVerticalOffset(0);
+                }
             }
         }
         catch (Exception ex)

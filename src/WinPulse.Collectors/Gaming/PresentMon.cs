@@ -211,10 +211,11 @@ public sealed class PresentMonCapture
         }
 
         string? error = null;
+        // PresentMon создаёт файл только когда видит первый кадр, поэтому «нет файла» обычно значит «нет кадров».
         if (frames.Count == 0)
-            error = !File.Exists(csv)
-                ? Lang.T("PresentMon не создал файл замера. Возможно, его заблокировал антивирус.", "PresentMon didn't create a capture file. An antivirus may have blocked it.")
-                : Lang.T("Кадров не записано: игра не рисовала кадры через DirectX/Vulkan или была свёрнута.", "No frames recorded: the game didn't present frames via DirectX/Vulkan or was minimized.");
+            error = Lang.T(
+                "Кадров не записано. Проверьте, что игра запущена и развёрнута, а не стоит в меню паузы в фоне. Если игра работает, а кадров всё равно нет, PresentMon мог заблокировать антивирус.",
+                "No frames recorded. Make sure the game is running and in focus, not paused in the background. If it is and there are still no frames, an antivirus may have blocked PresentMon.");
 
         return new CaptureResult
         {
