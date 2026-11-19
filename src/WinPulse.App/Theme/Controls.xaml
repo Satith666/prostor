@@ -36,6 +36,9 @@
     <i:NullToVisibilityConverter x:Key="NullToVisInv" Invert="True"/>
     <i:NotNullConverter x:Key="NotNull"/>
     <i:UpperConverter x:Key="Upper"/>
+    <i:NotConverter x:Key="Not"/>
+    <i:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
+    <i:ZeroToVisibilityConverter x:Key="ZeroToVisInv" Invert="True"/>
 
     <!-- Иконки 24×24 (контурные) -->
     <Geometry x:Key="Icon.Overview">M3,3 H10 V10 H3 Z M14,3 H21 V10 H14 Z M3,14 H10 V21 H3 Z M14,14 H21 V21 H14 Z</Geometry>

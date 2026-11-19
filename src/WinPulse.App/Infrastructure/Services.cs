@@ -214,6 +214,28 @@ public sealed class NotNullConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
 }
 
+/// <summary>Логическое «не».</summary>
+public sealed class NotConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not true;
+}
+
+/// <summary>Число 0 → Visible (подсказка «пока пусто»); Invert — наоборот.</summary>
+public sealed class ZeroToVisibilityConverter : IValueConverter
+{
+    public bool Invert { get; set; }
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        bool zero = value is int i ? i == 0 : value is null;
+        if (Invert) zero = !zero;
+        return zero ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
 /// <summary>Строка в верхнем регистре (подписи разделов меню).</summary>
 public sealed class UpperConverter : IValueConverter
 {

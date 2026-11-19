@@ -6,8 +6,10 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using WinPulse.App.Infrastructure;
 using WinPulse.Collectors;
+using WinPulse.Collectors.Gaming;
 using WinPulse.Core;
 using WinPulse.Core.Formatting;
+using WinPulse.Core.Gaming;
 
 namespace WinPulse.App.ViewModels;
 
@@ -70,6 +72,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private int _pending;
     private bool _disposed;
     private MonitorFrame? _last;
+    private readonly GameSessionTracker _tracker = new();
+    private int _sessionTicks;
     private NavItem? _selected;
     private PageViewModel? _page;
     private bool _proMode;
@@ -104,24 +108,33 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             var problems = Nav.FirstOrDefault(n => n.Key == "problems");
             if (problems is not null) problems.Alert = count > 0 ? count.ToString() : null;
         };
-        Add("problems", "nav.problems", "Icon.Problems", Problems, "nav.diagnostics");
-        Add("windowed", "nav.windowed", "Icon.Game", Windowed, "nav.optimization");
+        Games = new GamesViewModel();
+        Add("lab", "nav.lab", "Icon.Lab", Games, "nav.games");
+        Add("windowed", "nav.windowed", "Icon.Game", Windowed);
+        Add("problems", "nav.problems", "Icon.Problems", Problems, "nav.system");
         Add("optimize", "nav.optimize", "Icon.Optimize", Optimization);
         Add("startup", "nav.startup", "Icon.Startup", Startup);
         Add("drivers", "nav.drivers", "Icon.Drivers", new DriversViewModel());
-        Add("lab", "nav.lab", "Icon.Lab", new PlaceholderViewModel("lab", "Лаборатория FPS", "Этап 4 и 7",
-            "Замер кадров в игре до и после изменений (PresentMon): средний FPS, 1% low, время кадра и задержка.",
-            new[]
+
+        // Игровые сессии пишутся в фоне, на каждом кадре мониторинга (даже если окно свёрнуто).
+        _tracker.IsPinned = path => path is not null && _settings.GameExe is string pinned &&
+                                    string.Equals(path, pinned, StringComparison.OrdinalIgnoreCase);
+        _tracker.Started += record => _dispatcher.InvokeAsync(() => Games.OnSessionState(record));
+        _tracker.Finished += record =>
+        {
+            GameStore.SaveSession(record);
+            _dispatcher.InvokeAsync(() =>
             {
-                "Запись замера одной кнопкой или горячей клавишей",
-                "Сравнение «до/после» на одном графике",
-                "Понятный вывод: стало лучше или нет",
-            }), "nav.soon", soon: true);
+                Games.AddSession(record);
+                Games.OnSessionState(null);
+            });
+        };
+        Games.OnSessionState(null);
 
         _proMode = settings.ProMode;
         UiState.I.ProMode = _proMode;
-        _english = settings.Language == "en";
-        Lang.English = _english;
+        // Язык уже выставлен при запуске (с учётом --lang); здесь только запоминаем.
+        _english = Lang.English;
 
         Lang.Changed += () =>
         {
@@ -137,6 +150,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<NavItem> Nav { get; } = new();
     public OverviewViewModel Overview { get; }
     public ProblemsViewModel Problems { get; }
+    public GamesViewModel Games { get; }
     public FixModuleViewModel Windowed { get; }
     public FixModuleViewModel Optimization { get; }
     public StartupViewModel Startup { get; }
@@ -250,6 +264,17 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 Log.Error("tick", ex);
                 return;
             }
+
+            try
+            {
+                _tracker.Feed(frame, IsDemo ? 0 : Foreground.ProcessId(), Games.CurrentFps);
+                if (_tracker.Current is { } current && ++_sessionTicks % 15 == 0)
+                    _dispatcher.InvokeAsync(() => Games.OnSessionState(current));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("session", ex);
+            }
         }
 
         // Если предыдущий кадр ещё рисуется — этот пропускаем, чтобы интерфейс не отставал.
@@ -329,6 +354,14 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         {
             if (_disposed) return;
             _disposed = true;
+            try
+            {
+                _tracker.Flush(DateTime.Now); // сохранить незаконченную сессию при выходе
+            }
+            catch (Exception ex)
+            {
+                Log.Error("session-flush", ex);
+            }
             _engine.Dispose();
         }
     }
