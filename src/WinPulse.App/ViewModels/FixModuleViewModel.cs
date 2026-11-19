@@ -112,6 +112,10 @@ public sealed class FixItemVm : ObservableObject
     public bool CanRevert { get => _canRevert; private set => Set(ref _canRevert, value); }
     public bool ShowSteps { get => _showSteps; set => Set(ref _showSteps, value); }
 
+    private string? _sectionHeader;
+    /// <summary>Заголовок раздела над карточкой — только у первого пункта раздела.</summary>
+    public string? SectionHeader { get => _sectionHeader; set => Set(ref _sectionHeader, value); }
+
     public ICommand FixCommand { get; }
     public ICommand RevertCommand { get; }
     public ICommand ToggleStepsCommand { get; }
@@ -280,8 +284,14 @@ public sealed class FixModuleViewModel : PageViewModel, IFixHost
             });
             _ctx = ctx;
 
+            string? previousSection = null;
             for (int i = 0; i < Items.Count; i++)
+            {
                 Items[i].Apply(states[i], _module.Backup.ForItem(Items[i].Item.Id).Count > 0);
+                string? section = Items[i].Item.Section;
+                Items[i].SectionHeader = section != previousSection ? section : null;
+                previousSection = section;
+            }
 
             int available = states.Count(s => s.Status != FixStatus.NotAvailable);
             int ok = states.Count(s => s.Status == FixStatus.Ok);

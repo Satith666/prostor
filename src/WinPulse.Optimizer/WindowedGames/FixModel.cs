@@ -82,6 +82,8 @@ public abstract class FixItem
     public abstract string Title { get; }
     /// <summary>Что это и зачем — простыми словами.</summary>
     public abstract string Explanation { get; }
+    /// <summary>Раздел на странице (null — без заголовка). Пункты одного раздела должны идти подряд.</summary>
+    public virtual string? Section => null;
 
     public abstract FixState Evaluate(FixContext ctx);
 

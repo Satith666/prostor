@@ -7,7 +7,8 @@ using WinPulse.Optimizer.WindowedGames;
 namespace WinPulse.Optimizer.Optimization;
 
 /// <summary>
-/// «Оптимизация Windows»: только настройки с понятным и проверяемым эффектом. Каждая — с ценой, резервной копией и откатом.
+/// «Оптимизация»: только настройки с понятным и проверяемым эффектом. Каждая — с ценой, резервной копией и откатом.
+/// Два раздела: «Для игр» (то, что влияет на игру) и «Windows без лишнего» (реклама и подсказки — на FPS не влияют, и это сказано прямо).
 /// Схема питания, игровой режим, HAGS и фоновая запись — в модуле «Игры в окне», здесь не дублируются.
 /// </summary>
 public sealed class OptimizationModule : FixModule
@@ -15,8 +16,10 @@ public sealed class OptimizationModule : FixModule
     public OptimizationModule(string? backupPath = null)
         : base("optimization", new FixItem[]
         {
-            new MemoryIntegrityItem(),
+            new MaxRefreshItem(),
             new MouseAccelerationItem(),
+            new StickyKeysItem(),
+            new MemoryIntegrityItem(),
             new PageFileItem(),
             new FastStartupItem(),
             new TransparencyItem(),
@@ -26,6 +29,9 @@ public sealed class OptimizationModule : FixModule
         }, backupPath)
     {
     }
+
+    internal static string GamesSection => Lang.T("Для игр", "For games");
+    internal static string TidySection => Lang.T("Windows без лишнего — на FPS не влияет", "Windows without clutter — doesn't affect FPS");
 }
 
 internal static class OptPaths
@@ -41,6 +47,9 @@ internal static class OptPaths
     public const string Engagement = @"Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement";
     public const string Search = @"Software\Microsoft\Windows\CurrentVersion\Search";
     public const string ExplorerPolicy = @"Software\Policies\Microsoft\Windows\Explorer";
+    public const string StickyKeys = @"Control Panel\Accessibility\StickyKeys";
+    public const string FilterKeys = @"Control Panel\Accessibility\Keyboard Response";
+    public const string ToggleKeys = @"Control Panel\Accessibility\ToggleKeys";
 }
 
 /// <summary>Базовый класс для пунктов-переключателей «включено/выключено», где оба состояния допустимы.</summary>
@@ -66,7 +75,8 @@ public abstract class ToggleItem : FixItem
 public sealed class MemoryIntegrityItem : ToggleItem
 {
     public override string Id => "hvci";
-    public override int Number => 1;
+    public override int Number => 4;
+    public override string? Section => OptimizationModule.GamesSection;
     public override string Title => Lang.T("Изоляция ядра: целостность памяти (HVCI)", "Core isolation: Memory integrity (HVCI)");
     public override string Explanation => Lang.T(
         "Защита, которая не даёт вредоносному коду попасть в ядро Windows. Цена — до 5–10% FPS в части игр, особенно на процессорах старше 2018 года. " +
@@ -123,43 +133,207 @@ public sealed class MemoryIntegrityItem : ToggleItem
     }
 }
 
+// 1. Частота монитора
+public sealed class MaxRefreshItem : FixItem
+{
+    public override string Id => "max-refresh";
+    public override int Number => 1;
+    public override string? Section => OptimizationModule.GamesSection;
+    public override string Title => Lang.T("Монитор работает на полной частоте", "Monitor runs at its full refresh rate");
+    public override string Explanation => Lang.T(
+        "Частая ситуация: монитор на 144 или 165 Гц после установки Windows или драйвера работает на 60 Гц. " +
+        "Игра может выдавать 200 кадров, но на экране вы увидите только 60 в секунду. Это самая заметная прибавка плавности — проверьте её первой. " +
+        "Если высокой частоты нет в списке вовсе, частая причина — старый кабель HDMI: на 1440p и выше лучше DisplayPort.",
+        "A common case: a 144 or 165 Hz monitor runs at 60 Hz after installing Windows or a driver. " +
+        "The game may render 200 frames, but you'll only see 60 a second. This is the most noticeable smoothness gain — check it first. " +
+        "If the high rate isn't offered at all, an old HDMI cable is a frequent cause: use DisplayPort at 1440p and above.");
+
+    public override FixState Evaluate(FixContext ctx)
+    {
+        if (ctx.Monitors.Count == 0)
+            return FixState.Unavailable(Lang.T("Не удалось получить список мониторов.", "Couldn't list the monitors."));
+
+        var entries = ctx.Monitors.Select(m => new FixEntry(
+            m.FriendlyName,
+            Lang.T($"{m.Width}×{m.Height}: сейчас {m.RefreshHz} Гц, максимум {m.MaxRefreshHz} Гц",
+                $"{m.Width}×{m.Height}: now {m.RefreshHz} Hz, max {m.MaxRefreshHz} Hz"),
+            Warning: m.RefreshHz < m.MaxRefreshHz)).ToList();
+        string technical = string.Join("\n", ctx.Monitors.Select(m =>
+            $"{m.DeviceName}: {m.Width}×{m.Height} @ {m.RefreshHz} Hz; " + Lang.T("доступно", "available") + ": " + string.Join(", ", m.RefreshRates)));
+
+        var low = ctx.Monitors.Where(m => m.RefreshHz < m.MaxRefreshHz).ToList();
+        if (low.Count == 0)
+        {
+            return new FixState
+            {
+                Status = FixStatus.Ok,
+                StatusText = Lang.T("Полная частота: ", "Full rate: ") + string.Join(" + ", ctx.Monitors.Select(m => m.RefreshHz + " " + WgPaths.Hz)),
+                Entries = entries,
+                Technical = technical,
+            };
+        }
+
+        return new FixState
+        {
+            Status = FixStatus.Improvable,
+            StatusText = string.Join(", ", low.Select(m => $"{m.RefreshHz} {Lang.T("из", "of")} {m.MaxRefreshHz} {WgPaths.Hz}")),
+            Reason = string.Join(" ", low.Select(m => Lang.T(
+                $"«{m.FriendlyName}» работает на {m.RefreshHz} Гц, хотя умеет {m.MaxRefreshHz} Гц.",
+                $"“{m.FriendlyName}” runs at {m.RefreshHz} Hz but supports {m.MaxRefreshHz} Hz."))),
+            CanFix = true,
+            FixLabel = Lang.T("Включить полную частоту", "Use the full refresh rate"),
+            Recommended = true,
+            Entries = entries,
+            Technical = technical,
+        };
+    }
+
+    public override List<Change> PlanFix(FixContext ctx) => ctx.Monitors
+        .Where(m => m.RefreshHz < m.MaxRefreshHz)
+        .Select(m => new Change
+        {
+            ItemId = Id,
+            Kind = ChangeKind.DisplayRefresh,
+            DeviceName = m.DeviceName,
+            Width = m.Width,
+            Height = m.Height,
+            Frequency = m.MaxRefreshHz,
+            Title = Title + " — " + m.FriendlyName,
+            Before = $"{m.RefreshHz} {WgPaths.Hz}",
+            After = $"{m.MaxRefreshHz} {WgPaths.Hz}",
+            Why = Lang.T("Экран начнёт показывать столько кадров в секунду, сколько умеет. Если изображение пропадёт — ничего не нажимайте, Windows вернёт прежнюю частоту через 15 секунд.",
+                "The screen will show as many frames per second as it can. If the picture disappears, don't press anything: Windows reverts in 15 seconds."),
+        })
+        .ToList();
+}
+
 // 2. Ускорение мыши
-public sealed class MouseAccelerationItem : ToggleItem
+public sealed class MouseAccelerationItem : FixItem
 {
     public override string Id => "mouse-accel";
     public override int Number => 2;
-    public override string Title => Lang.T("Ускорение указателя мыши", "Mouse pointer acceleration");
+    public override string? Section => OptimizationModule.GamesSection;
+    public override string Title => Lang.T("Мышь без ускорения", "Mouse without acceleration");
     public override string Explanation => Lang.T(
-        "«Повышенная точность установки указателя» меняет расстояние, на которое двигается курсор, в зависимости от скорости движения мыши. " +
-        "Для прицеливания удобнее, когда одно и то же движение руки всегда даёт одинаковый сдвиг. Большинство современных игр ускорение и так не используют.",
-        "“Enhance pointer precision” changes how far the cursor moves depending on how fast you move the mouse. " +
-        "For aiming it's better when the same hand motion always gives the same movement. Most modern games ignore acceleration anyway.");
+        "В Windows по умолчанию включена «Повышенная точность установки указателя» — на самом деле это ускорение: резкое движение сдвигает курсор дальше, чем медленное на то же расстояние. " +
+        "Для прицеливания это мешает: мышечная память работает, только когда одно и то же движение руки всегда даёт одинаковый сдвиг. Профессиональные игроки ускорение выключают. " +
+        "В играх с «сырым вводом» (raw input) оно не действует, но остаётся в меню, лаунчерах и старых играх.",
+        "Windows turns on “Enhance pointer precision” by default — it's actually acceleration: a fast flick moves the cursor further than a slow move over the same distance. " +
+        "That hurts aiming: muscle memory only works when the same hand motion always gives the same movement. Pro players turn it off. " +
+        "Games with raw input ignore it, but it still affects menus, launchers and older games.");
+
+    private static bool IsOn() => Reg.GetString(RegHive.CurrentUser, OptPaths.Mouse, "MouseSpeed") != "0";
 
     public override FixState Evaluate(FixContext ctx)
     {
         string? speed = Reg.GetString(RegHive.CurrentUser, OptPaths.Mouse, "MouseSpeed");
-        bool on = speed != "0";
-        return Toggle(on,
-            Lang.T("Включено", "On"), Lang.T("Выключено", "Off"),
-            Lang.T("Выключить ускорение", "Turn acceleration off"), Lang.T("Включить ускорение", "Turn acceleration on"),
-            Lang.T("Подействует после выхода из Windows и повторного входа.", "Takes effect after you sign out and back in."),
-            null, admin: false, restart: false,
-            technical: $@"HKCU\{OptPaths.Mouse} → MouseSpeed = {speed ?? Missing}, MouseThreshold1/2");
+        string? t1 = Reg.GetString(RegHive.CurrentUser, OptPaths.Mouse, "MouseThreshold1");
+        string? t2 = Reg.GetString(RegHive.CurrentUser, OptPaths.Mouse, "MouseThreshold2");
+        string technical = $@"HKCU\{OptPaths.Mouse} → MouseSpeed = {speed ?? Missing}, MouseThreshold1 = {t1 ?? Missing}, MouseThreshold2 = {t2 ?? Missing}";
+
+        if (!IsOn())
+        {
+            return new FixState
+            {
+                Status = FixStatus.Ok,
+                StatusText = Lang.T("Ускорение выключено", "Acceleration is off"),
+                Technical = technical,
+            };
+        }
+
+        return new FixState
+        {
+            Status = FixStatus.Improvable,
+            StatusText = Lang.T("Ускорение включено", "Acceleration is on"),
+            Reason = Lang.T("Курсор разгоняется при резком движении — прицел становится непредсказуемым. Подействует после выхода из Windows и повторного входа.",
+                "The cursor speeds up on fast moves, making aim unpredictable. Takes effect after you sign out and back in."),
+            CanFix = true,
+            FixLabel = Lang.T("Выключить ускорение", "Turn acceleration off"),
+            Recommended = true,
+            Technical = technical,
+        };
     }
 
     public override List<Change> PlanFix(FixContext ctx)
     {
-        bool on = Reg.GetString(RegHive.CurrentUser, OptPaths.Mouse, "MouseSpeed") != "0";
-        var values = on ? new[] { "0", "0", "0" } : new[] { "1", "6", "10" };
-        string why = on
-            ? Lang.T("Курсор будет двигаться строго пропорционально движению мыши.", "The cursor will move strictly in proportion to the mouse.")
-            : Lang.T("Возвращает стандартное ускорение Windows.", "Restores the default Windows acceleration.");
+        if (!IsOn()) return new();
+        string why = Lang.T("Курсор будет двигаться строго пропорционально движению мыши.", "The cursor will move strictly in proportion to the mouse.");
         var names = new[] { "MouseSpeed", "MouseThreshold1", "MouseThreshold2" };
-        var list = new List<Change>();
-        for (int i = 0; i < names.Length; i++)
+        return names.Select(n => RegChange(RegHive.CurrentUser, OptPaths.Mouse, n, "String", "0",
+            Reg.GetString(RegHive.CurrentUser, OptPaths.Mouse, n) ?? Missing, "0", why)).ToList();
+    }
+}
+
+// 3. Залипание клавиш
+public sealed class StickyKeysItem : FixItem
+{
+    // Флаг «включать сочетанием клавиш»: SKF_HOTKEYACTIVE, FKF_HOTKEYACTIVE, TKF_HOTKEYACTIVE = 0x4.
+    private const int HotkeyActive = 0x4;
+    // Сама функция включена (её используют намеренно) — тогда не трогаем.
+    private const int FeatureOn = 0x1;
+
+    private static readonly (string Key, string Name)[] Features =
+    {
+        (OptPaths.StickyKeys, "StickyKeys"),
+        (OptPaths.FilterKeys, "FilterKeys"),
+        (OptPaths.ToggleKeys, "ToggleKeys"),
+    };
+
+    public override string Id => "sticky-keys";
+    public override int Number => 3;
+    public override string? Section => OptimizationModule.GamesSection;
+    public override string Title => Lang.T("Окно «Залипание клавиш» посреди игры", "“Sticky Keys” pop-up in the middle of a game");
+    public override string Explanation => Lang.T(
+        "Если пять раз нажать Shift (или долго держать правый Shift), Windows сворачивает игру и спрашивает, включить ли залипание клавиш. " +
+        "В шутерах, где Shift — бег или присед, это случается в самый неподходящий момент. Пункт отключает только это сочетание клавиш; " +
+        "сами специальные возможности остаются в «Параметрах», и включить их можно в любой момент.",
+        "Press Shift five times (or hold right Shift) and Windows minimizes the game to ask about Sticky Keys. " +
+        "In shooters where Shift is sprint or crouch it happens at the worst moment. This only disables the shortcut; " +
+        "the accessibility features stay in Settings and can be turned on at any time.");
+
+    private static int? Flags(string key) =>
+        int.TryParse(Reg.GetString(RegHive.CurrentUser, key, "Flags"), out int v) ? v : null;
+
+    private static bool HotkeyArmed(int? flags) => flags is int f && (f & HotkeyActive) != 0 && (f & FeatureOn) == 0;
+
+    public override FixState Evaluate(FixContext ctx)
+    {
+        var states = Features.Select(f => (f.Name, f.Key, Value: Flags(f.Key))).ToList();
+        string technical = string.Join("\n", states.Select(s => $@"HKCU\{s.Key} → Flags = {s.Value?.ToString() ?? Missing}"));
+        var armed = states.Where(s => HotkeyArmed(s.Value)).ToList();
+        if (armed.Count == 0)
         {
-            string? current = Reg.GetString(RegHive.CurrentUser, OptPaths.Mouse, names[i]);
-            list.Add(RegChange(RegHive.CurrentUser, OptPaths.Mouse, names[i], "String", values[i], current ?? Missing, values[i], why));
+            return new FixState
+            {
+                Status = FixStatus.Ok,
+                StatusText = Lang.T("Сочетания выключены", "Shortcuts are off"),
+                Technical = technical,
+            };
+        }
+
+        return new FixState
+        {
+            Status = FixStatus.Improvable,
+            StatusText = Lang.T("Сочетания включены", "Shortcuts are on"),
+            Reason = Lang.T("Окно может выскочить при частом нажатии Shift: ", "The pop-up can appear when Shift is pressed often: ") + string.Join(", ", armed.Select(a => a.Name)) +
+                     Lang.T(". Подействует после выхода из Windows и повторного входа.", ". Takes effect after you sign out and back in."),
+            CanFix = true,
+            FixLabel = Lang.T("Отключить сочетания", "Turn the shortcuts off"),
+            Recommended = true,
+            Technical = technical,
+        };
+    }
+
+    public override List<Change> PlanFix(FixContext ctx)
+    {
+        var list = new List<Change>();
+        foreach (var (key, name) in Features)
+        {
+            int? flags = Flags(key);
+            if (!HotkeyArmed(flags)) continue;
+            int target = flags!.Value & ~HotkeyActive;
+            list.Add(RegChange(RegHive.CurrentUser, key, "Flags", "String", target.ToString(), flags.Value.ToString(), target.ToString(),
+                Lang.T($"{name}: больше не включается сочетанием клавиш.", $"{name}: no longer turned on by a key shortcut.")));
         }
         return list;
     }
@@ -171,7 +345,8 @@ public sealed class PageFileItem : FixItem
     private const string Auto = @"?:\pagefile.sys";
 
     public override string Id => "pagefile";
-    public override int Number => 3;
+    public override int Number => 5;
+    public override string? Section => OptimizationModule.GamesSection;
     public override string Title => Lang.T("Файл подкачки", "Page file");
     public override string Explanation => Lang.T(
         "Когда оперативной памяти не хватает, Windows временно переносит редко используемые данные на диск. " +
@@ -237,7 +412,8 @@ public sealed class PageFileItem : FixItem
 public sealed class FastStartupItem : ToggleItem
 {
     public override string Id => "fast-startup";
-    public override int Number => 4;
+    public override int Number => 6;
+    public override string? Section => OptimizationModule.TidySection;
     public override string Title => Lang.T("Быстрый запуск", "Fast startup");
     public override string Explanation => Lang.T(
         "При «Завершении работы» Windows сохраняет ядро и драйверы на диск, чтобы следующее включение было быстрее. " +
@@ -279,7 +455,8 @@ public sealed class FastStartupItem : ToggleItem
 public sealed class TransparencyItem : ToggleItem
 {
     public override string Id => "transparency";
-    public override int Number => 5;
+    public override int Number => 7;
+    public override string? Section => OptimizationModule.TidySection;
     public override string Title => Lang.T("Эффекты прозрачности", "Transparency effects");
     public override string Explanation => Lang.T(
         "Полупрозрачные «Пуск», панель задач и окна. На встроенной графике немного нагружают видеоядро и батарею; на отдельной видеокарте разницы нет.",
@@ -347,7 +524,8 @@ public abstract class DwordSetItem : FixItem
 public sealed class SuggestedAppsItem : DwordSetItem
 {
     public override string Id => "auto-apps";
-    public override int Number => 6;
+    public override int Number => 8;
+    public override string? Section => OptimizationModule.TidySection;
     public override string Title => Lang.T("Автоустановка «рекомендуемых» приложений", "Automatic install of “suggested” apps");
     public override string Explanation => Lang.T(
         "Windows сама скачивает в фоне игры и приложения-«рекомендации» и добавляет их в «Пуск». Отключение останавливает это; уже установленное остаётся — его можно удалить как обычно.",
@@ -366,7 +544,8 @@ public sealed class SuggestedAppsItem : DwordSetItem
 public sealed class TipsItem : DwordSetItem
 {
     public override string Id => "tips";
-    public override int Number => 7;
+    public override int Number => 9;
+    public override string? Section => OptimizationModule.TidySection;
     public override string Title => Lang.T("Советы, предложения и напоминания Windows", "Windows tips, suggestions and nags");
     public override string Explanation => Lang.T(
         "Всплывающие «советы», предложения в «Пуске» и «Параметрах», напоминания «Завершите настройку устройства». Пользы мало, отвлекают.",
@@ -388,7 +567,8 @@ public sealed class TipsItem : DwordSetItem
 public sealed class WebSearchItem : DwordSetItem
 {
     public override string Id => "web-search";
-    public override int Number => 8;
+    public override int Number => 10;
+    public override string? Section => OptimizationModule.TidySection;
     public override string Title => Lang.T("Результаты из интернета в поиске «Пуска»", "Web results in Start search");
     public override string Explanation => Lang.T(
         "Поиск в «Пуске» отправляет каждый запрос в Bing и показывает веб-результаты. Без этого поиск программ и файлов быстрее и не уходит в интернет. " +

@@ -94,6 +94,9 @@
             <ItemsControl ItemsSource="{Binding Items}" Margin="0,16,0,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:FixItemVm}">
+                        <StackPanel>
+                        <TextBlock Text="{Binding SectionHeader}" Visibility="{Binding SectionHeader, Converter={StaticResource NullToVis}}"
+                                   FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Muted}" Margin="4,10,0,10"/>
                         <Border x:Name="card" Style="{StaticResource Card}" Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -222,6 +225,7 @@
                                 </StackPanel>
                             </Grid>
                         </Border>
+                        </StackPanel>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding StatusKey}" Value="ok">
                                 <Setter TargetName="chip" Property="Background" Value="{StaticResource GoodBg}"/>
