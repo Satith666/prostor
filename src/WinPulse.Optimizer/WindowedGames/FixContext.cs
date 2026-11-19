@@ -2,6 +2,7 @@ using System.Diagnostics;
 using WinPulse.Collectors;
 using WinPulse.Collectors.Display;
 using WinPulse.Collectors.Gpu;
+using WinPulse.Collectors.Hardware;
 using WinPulse.Core;
 using WinPulse.Core.Display;
 using WinPulse.Optimizer.Changes;
@@ -29,6 +30,8 @@ public sealed class FixContext
     public bool HasBattery { get; init; }
     public bool IsElevated { get; init; }
     public required BackupStore Backup { get; init; }
+    /// <summary>Память, шина видеокарты, диски игр. null — модулю не нужно.</summary>
+    public HardwareSnapshot? Hardware { get; init; }
     public Func<string, bool> IsMarked { get; init; } = _ => false;
 
     public VrrSupport BestVrr => Monitors.Count == 0 ? VrrSupport.No : Monitors.Max(m => m.Vrr);
@@ -49,8 +52,22 @@ public sealed class FixContext
         "Discord.exe", "NVIDIA Overlay.exe", "NVIDIA Share.exe", "GameBar.exe", "RTSS.exe",
     };
 
-    public static FixContext Build(string? gameExe, IReadOnlyDictionary<int, double>? gpuByPid, BackupStore backup, Func<string, bool> isMarked)
+    public static FixContext Build(string? gameExe, IReadOnlyDictionary<int, double>? gpuByPid, BackupStore backup, Func<string, bool> isMarked,
+        bool hardware = false)
     {
+        HardwareSnapshot? hw = null;
+        if (hardware)
+        {
+            try
+            {
+                hw = HardwareReader.Read();
+            }
+            catch (Exception ex)
+            {
+                Diag.Report("hardware-read", ex);
+            }
+        }
+
         var os = OsInfo.Read();
         var gpus = Dxgi.Enumerate().Where(g => !g.IsSoftware).ToList();
         var main = gpus.OrderByDescending(g => g.DedicatedMemory).FirstOrDefault();
@@ -85,6 +102,7 @@ public sealed class FixContext
             IsElevated = OsInfo.IsElevated(),
             Backup = backup,
             IsMarked = isMarked,
+            Hardware = hw,
         };
     }
 

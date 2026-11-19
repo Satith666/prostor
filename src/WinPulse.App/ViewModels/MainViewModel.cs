@@ -111,6 +111,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Games = new GamesViewModel();
         if (IsDemo && !Games.HasSessions) Games.AddSession(WinPulse.Core.Demo.DemoSession.Create());
         Add("lab", "nav.lab", "Icon.Lab", Games, "nav.games");
+        Add("hardware", "nav.hardware", "Icon.Chip", new FixModuleViewModel("hardware", new WinPulse.Optimizer.Hardware.HardwareModule(),
+            "hw.title", "hw.subtitle", "hw.summary", usesGame: false, settings, LastGpuByPid));
         Add("windowed", "nav.windowed", "Icon.Game", Windowed);
         Add("problems", "nav.problems", "Icon.Problems", Problems, "nav.system");
         Add("optimize", "nav.optimize", "Icon.Optimize", Optimization);

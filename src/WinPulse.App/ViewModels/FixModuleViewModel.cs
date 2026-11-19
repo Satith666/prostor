@@ -267,7 +267,7 @@ public sealed class FixModuleViewModel : PageViewModel, IFixHost
             var gpu = _gpuByPid();
             var (ctx, states) = await Task.Run(() =>
             {
-                var c = FixContext.Build(exe, gpu, _module.Backup, IsMarked);
+                var c = FixContext.Build(exe, gpu, _module.Backup, IsMarked, _module.NeedsHardware);
                 var s = _module.Items.Select(i =>
                 {
                     try

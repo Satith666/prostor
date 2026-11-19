@@ -20,6 +20,8 @@ public class FixModule
 
     public string Id { get; }
     public IReadOnlyList<FixItem> Items { get; }
+    /// <summary>Пунктам нужны сведения о железе (память, PCIe, диски игр) — их чтение занимает пару секунд.</summary>
+    public virtual bool NeedsHardware => false;
     public BackupStore Backup { get; }
     public ChangeExecutor Executor { get; }
 
