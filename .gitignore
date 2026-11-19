@@ -1,0 +1,4 @@
+build/
+cmd/setup/payload/
+*.syso
+__pycache__/

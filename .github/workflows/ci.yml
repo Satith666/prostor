@@ -1,0 +1,101 @@
+# Prostor: сборка и проверка на каждый push.
+#  1. Linux: форматирование, vet, модульные тесты, тест приманок, самопроверка
+#     с интерфейсом в Chrome, сборка установщика (check.sh).
+#  2. Настоящая Windows (Server 2025, Server 2022, Windows 11 ARM): тихая
+#     установка, окно WebView2, тест приманок в песочнице и на живой системе,
+#     помощник с правами, полная самопроверка, удаление программы.
+#  3. Тег v* — выпуск на странице Releases.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Сборка и тесты (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Зависимости
+        run: sudo apt-get install -y python3-pil
+      - name: Полная проверка
+        run: ./check.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prostor-build
+          path: |
+            build/*.exe
+            build/report-*.html
+          if-no-files-found: error
+
+  windows:
+    name: Windows (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-2022, windows-11-arm]
+    env:
+      APP: C:\Program Files\Prostor\Prostor.exe
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: prostor-build
+          path: dist
+      - name: Тихая установка
+        run: ./ci/windows.ps1 install
+      - name: Окно WebView2
+        run: ./ci/windows.ps1 webview2
+      - name: Тест приманок в песочнице
+        run: ./ci/windows.ps1 bait
+      - name: Тест приманок на живой системе
+        run: ./ci/windows.ps1 bait-live
+      - name: Помощник с правами администратора
+        run: ./ci/windows.ps1 helper
+      - name: Полная самопроверка
+        run: ./ci/windows.ps1 selftest ${{ matrix.os == 'windows-2025' && 'full' || 'quick' }}
+      - name: Удаление программы
+        run: ./ci/windows.ps1 uninstall
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-${{ matrix.os }}
+          path: reports/
+
+  release:
+    name: Выпуск
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: prostor-build
+          path: dist
+      - name: Страница выпуска
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/Prostor-Setup-*.exe \
+            --repo "$GITHUB_REPOSITORY" --title "Prostor ${GITHUB_REF_NAME#v}" \
+            --notes "Установщик проверен автотестами на Windows Server 2025, Windows Server 2022 и Windows 11 ARM."
