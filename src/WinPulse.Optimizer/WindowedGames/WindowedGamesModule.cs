@@ -22,6 +22,8 @@ public class FixModule
     public IReadOnlyList<FixItem> Items { get; }
     /// <summary>Пунктам нужны сведения о железе (память, PCIe, диски игр) — их чтение занимает пару секунд.</summary>
     public virtual bool NeedsHardware => false;
+    /// <summary>Модуль только находит и объясняет, ничего не меняет (нет кнопок «Исправить всё» и резервной копии).</summary>
+    public virtual bool IsDiagnosticOnly => false;
     public BackupStore Backup { get; }
     public ChangeExecutor Executor { get; }
 

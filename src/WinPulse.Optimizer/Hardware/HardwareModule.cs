@@ -27,6 +27,7 @@ public sealed class HardwareModule : FixModule
     }
 
     public override bool NeedsHardware => true;
+    public override bool IsDiagnosticOnly => true;
 
     internal static FixState NoData() => FixState.Unavailable(Lang.T(
         "Windows не отдала сведения о памяти (служба WMI не ответила). Попробуйте «Обновить» чуть позже.",

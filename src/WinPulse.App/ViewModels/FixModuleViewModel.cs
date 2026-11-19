@@ -211,6 +211,8 @@ public sealed class FixModuleViewModel : PageViewModel, IFixHost
 
     public override string Key => _key;
     public bool UsesGame { get; }
+    /// <summary>Страница только диагностирует: прячем «Исправить всё», «Вернуть всё» и строку о резервной копии.</summary>
+    public bool CanChange => !_module.IsDiagnosticOnly;
     public string Title => Loc.Get(_titleKey);
     public string Subtitle => Loc.Get(_subtitleKey);
     public ObservableCollection<FixItemVm> Items { get; } = new();

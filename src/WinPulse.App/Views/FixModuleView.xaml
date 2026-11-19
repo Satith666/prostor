@@ -70,7 +70,7 @@
                         <c:FractionBar Height="6" Margin="0,10,0,10" MaxWidth="420" HorizontalAlignment="Left" Width="420"
                                        Value="{Binding Progress}" Fill="{StaticResource Good}" Track="{StaticResource Track}"/>
                         <TextBlock Text="{Binding SystemText}" Style="{StaticResource FaintText}" TextWrapping="Wrap"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding CanChange, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="{Binding BackupText}" Style="{StaticResource FaintText}" VerticalAlignment="Center"/>
                             <Button Style="{StaticResource BtnGhost}" Padding="6,0" Command="{Binding OpenBackupCommand}">
                                 <TextBlock Text="{Binding [wg.backup], Source={x:Static i:Loc.I}}" FontSize="12"/>
@@ -81,9 +81,11 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" VerticalAlignment="Top">
                         <Button Style="{StaticResource BtnPrimary}" Command="{Binding FixAllCommand}" Padding="16,8"
-                                Content="{Binding [wg.fixall], Source={x:Static i:Loc.I}}"/>
+                                Content="{Binding [wg.fixall], Source={x:Static i:Loc.I}}"
+                                Visibility="{Binding CanChange, Converter={StaticResource BoolToVis}}"/>
                         <Button Style="{StaticResource Btn}" Command="{Binding RevertAllCommand}" Margin="0,8,0,0"
-                                Content="{Binding [wg.revertall], Source={x:Static i:Loc.I}}"/>
+                                Content="{Binding [wg.revertall], Source={x:Static i:Loc.I}}"
+                                Visibility="{Binding CanChange, Converter={StaticResource BoolToVis}}"/>
                         <Button Style="{StaticResource BtnGhost}" Command="{Binding RefreshCommand}" Margin="0,6,0,0" HorizontalAlignment="Center"
                                 Content="{Binding [common.refresh], Source={x:Static i:Loc.I}}"/>
                     </StackPanel>
@@ -200,7 +202,8 @@
                                                 Content="{Binding FixLabel}"
                                                 Visibility="{Binding CanFix, Converter={StaticResource BoolToVis}}"/>
                                         <Button Style="{StaticResource Btn}" Margin="0,0,8,6" Command="{Binding RevertCommand}"
-                                                Content="{Binding [wg.revert], Source={x:Static i:Loc.I}}"/>
+                                                Content="{Binding [wg.revert], Source={x:Static i:Loc.I}}"
+                                                Visibility="{Binding CanRevert, Converter={StaticResource BoolToVis}}"/>
                                         <ItemsControl ItemsSource="{Binding Actions}" Focusable="False">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
