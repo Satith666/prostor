@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Media;
 
@@ -5,15 +6,16 @@ namespace WinPulse.App.Controls;
 
 /// <summary>
 /// График с заливкой: последние значения прижаты к правому краю.
+/// Тип свойств — IReadOnlyList, а не массив: WPF не умеет задавать свойства-массивы внутри шаблонов.
 /// Values — основная серия (с заливкой), Values2 — вторая линия (например, запись или отправка).
 /// </summary>
 public sealed class AreaChart : FrameworkElement
 {
     public static readonly DependencyProperty ValuesProperty = DependencyProperty.Register(
-        nameof(Values), typeof(double[]), typeof(AreaChart), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+        nameof(Values), typeof(IReadOnlyList<double>), typeof(AreaChart), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty Values2Property = DependencyProperty.Register(
-        nameof(Values2), typeof(double[]), typeof(AreaChart), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+        nameof(Values2), typeof(IReadOnlyList<double>), typeof(AreaChart), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty CapacityProperty = DependencyProperty.Register(
         nameof(Capacity), typeof(int), typeof(AreaChart), new FrameworkPropertyMetadata(60, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -39,8 +41,8 @@ public sealed class AreaChart : FrameworkElement
     public static readonly DependencyProperty FillOpacityProperty = DependencyProperty.Register(
         nameof(FillOpacity), typeof(double), typeof(AreaChart), new FrameworkPropertyMetadata(0.16, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public double[]? Values { get => (double[]?)GetValue(ValuesProperty); set => SetValue(ValuesProperty, value); }
-    public double[]? Values2 { get => (double[]?)GetValue(Values2Property); set => SetValue(Values2Property, value); }
+    public IReadOnlyList<double>? Values { get => (IReadOnlyList<double>?)GetValue(ValuesProperty); set => SetValue(ValuesProperty, value); }
+    public IReadOnlyList<double>? Values2 { get => (IReadOnlyList<double>?)GetValue(Values2Property); set => SetValue(Values2Property, value); }
     public int Capacity { get => (int)GetValue(CapacityProperty); set => SetValue(CapacityProperty, value); }
     /// <summary>Верх шкалы. NaN — подбирается по данным.</summary>
     public double Maximum { get => (double)GetValue(MaximumProperty); set => SetValue(MaximumProperty, value); }
@@ -83,10 +85,10 @@ public sealed class AreaChart : FrameworkElement
         DrawSeries(dc, Values2, Stroke2, max, w, h, fill: false);
     }
 
-    private void DrawSeries(DrawingContext dc, double[]? values, Brush stroke, double max, double w, double h, bool fill)
+    private void DrawSeries(DrawingContext dc, IReadOnlyList<double>? values, Brush stroke, double max, double w, double h, bool fill)
     {
-        if (values is null || values.Length < 2) return;
-        int n = values.Length;
+        if (values is null || values.Count < 2) return;
+        int n = values.Count;
         int capacity = Math.Max(Capacity, n);
         double step = w / (capacity - 1);
         double x0 = w - (n - 1) * step;
