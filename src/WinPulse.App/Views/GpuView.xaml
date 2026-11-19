@@ -1,0 +1,74 @@
+<UserControl x:Class="WinPulse.App.Views.GpuView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinPulse.App.ViewModels"
+             xmlns:v="clr-namespace:WinPulse.App.Views"
+             xmlns:c="clr-namespace:WinPulse.App.Controls">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="28,24,28,28">
+            <TextBlock Text="Видеокарта" Style="{StaticResource H1}"/>
+            <TextBlock Text="Те же счётчики, что в Диспетчере задач: загрузка самого занятого блока видеокарты и видеопамять."
+                       Style="{StaticResource FaintText}" Margin="0,4,0,18" TextWrapping="Wrap"/>
+
+            <TextBlock Text="Счётчики видеокарты недоступны: нужен драйвер WDDM 2.0+ (Windows 10 1709 и новее)."
+                       Style="{StaticResource MutedText}" Margin="0,0,0,16"
+                       Visibility="{Binding Empty, Converter={StaticResource BoolToVis}}"/>
+
+            <ItemsControl ItemsSource="{Binding Gpus}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:GpuCardVm}">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="280"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <Grid>
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource H2}"/>
+                                        <TextBlock Text="{Binding Util}" Style="{StaticResource Big}" HorizontalAlignment="Right" Margin="0,-6,0,0"/>
+                                    </Grid>
+                                    <c:AreaChart Height="170" Margin="0,12,0,0" Values="{Binding Chart}" Capacity="600" Maximum="100"
+                                                 ShowGrid="True" GridBrush="{StaticResource Line}" Stroke="{StaticResource Series.Gpu}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="ВИДЕОПАМЯТЬ" Style="{StaticResource Caption}"/>
+                                    <TextBlock Text="{Binding Vram}" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                                    <c:FractionBar Height="6" Margin="0,6,0,18" Value="{Binding VramFraction}" Fill="{StaticResource Series.Gpu}" Track="{StaticResource Track}"/>
+                                    <TextBlock Text="БЛОКИ ВИДЕОКАРТЫ" Style="{StaticResource Caption}" Margin="0,0,0,6"/>
+                                    <ItemsControl ItemsSource="{Binding Engines}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:EngineVm}">
+                                                <StackPanel Margin="0,0,0,8">
+                                                    <Grid>
+                                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource Muted}"/>
+                                                        <TextBlock Text="{Binding Value}" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                                    </Grid>
+                                                    <c:FractionBar Height="3" Margin="0,4,0,0" Value="{Binding Fraction}" Fill="{StaticResource Series.Gpu}" Track="{StaticResource Track}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,0,16" Visibility="{Binding Verdict, Converter={StaticResource NullToVis}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding Verdict}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding VerdictDetail}" Style="{StaticResource MutedText}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Кто нагружает видеокарту" Style="{StaticResource H2}" Margin="0,0,0,10"/>
+                    <v:AppTable DataContext="{Binding Table}"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

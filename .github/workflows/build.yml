@@ -1,0 +1,39 @@
+name: WinPulse build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Сначала сама программа: если упадут только тесты, exe всё равно будет.
+      - name: Publish WinPulse.exe
+        run: dotnet publish src/WinPulse.App/WinPulse.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o dist -nologo "-flp:LogFile=build-errors.txt;ErrorsOnly"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinPulse-win-x64
+          path: dist/WinPulse.exe
+
+      - name: Tests
+        if: always()
+        run: dotnet test tests/WinPulse.Core.Tests/WinPulse.Core.Tests.csproj -c Release -nologo
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-errors
+          path: build-errors.txt
+          if-no-files-found: ignore

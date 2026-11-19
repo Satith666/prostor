@@ -1,0 +1,9 @@
+bin/
+obj/
+dist/
+.vs/
+*.user
+TestResults/
+build-errors.txt
+test-log.txt
+.dotnet/

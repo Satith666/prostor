@@ -1,0 +1,72 @@
+namespace WinPulse.Core.Knowledge;
+
+/// <summary>Понятное имя и подсказка для известного процесса. IsSystem — часть Windows, завершать нельзя.</summary>
+public sealed record KnownProcess(string DisplayName, string Hint, bool IsSystem);
+
+public static class KnownProcesses
+{
+    private static readonly Dictionary<string, KnownProcess> Map = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["System"] = new("Ядро Windows (System)",
+            "Ядро и драйверы. Если нагрузка высокая постоянно, чаще всего виноват драйвер устройства.", true),
+        ["Registry"] = new("Реестр Windows",
+            "Хранит реестр в памяти. Нагрузки почти не создаёт.", true),
+        ["Memory Compression"] = new("Сжатие памяти",
+            "Windows сжимает редко используемые данные вместо записи на диск. Это нормально и экономит память.", true),
+        ["Secure System"] = new("Защищённая система (VBS)",
+            "Работает, когда включены изоляция ядра или Device Guard.", true),
+        ["smss.exe"] = new("Диспетчер сеансов", "Системный процесс запуска Windows.", true),
+        ["csrss.exe"] = new("Среда выполнения клиент-сервер", "Системный процесс, без него Windows не работает.", true),
+        ["wininit.exe"] = new("Запуск Windows", "Системный процесс.", true),
+        ["winlogon.exe"] = new("Вход в Windows", "Отвечает за вход и экран блокировки.", true),
+        ["services.exe"] = new("Диспетчер служб", "Запускает и останавливает службы Windows.", true),
+        ["lsass.exe"] = new("Локальная безопасность (LSASS)", "Проверяет пароли и права. Завершать нельзя.", true),
+        ["lsaiso.exe"] = new("Изолированная LSA", "Часть защиты учётных данных.", true),
+        ["fontdrvhost.exe"] = new("Драйвер шрифтов", "Отрисовка шрифтов.", true),
+        ["dwm.exe"] = new("Диспетчер окон рабочего стола",
+            "Рисует окна и эффекты. Нагрузка растёт при высокой частоте монитора, видео и прозрачности.", true),
+        ["explorer.exe"] = new("Проводник", "Рабочий стол, панель задач и окна папок.", false),
+        ["sihost.exe"] = new("Узел оболочки", "Часть интерфейса Windows.", true),
+        ["ctfmon.exe"] = new("Ввод текста (CTF)", "Раскладки клавиатуры и рукописный ввод.", true),
+        ["RuntimeBroker.exe"] = new("Посредник приложений", "Проверяет разрешения приложений из Microsoft Store.", true),
+        ["SearchHost.exe"] = new("Поиск Windows", "Окно поиска в меню «Пуск».", true),
+        ["SearchApp.exe"] = new("Поиск Windows", "Окно поиска в меню «Пуск».", true),
+        ["SearchIndexer.exe"] = new("Индексатор поиска",
+            "Составляет индекс файлов для быстрого поиска. После установки программ или копирования файлов нагрузка — нормальна.", true),
+        ["StartMenuExperienceHost.exe"] = new("Меню «Пуск»", "Интерфейс меню «Пуск».", true),
+        ["ShellExperienceHost.exe"] = new("Интерфейс оболочки", "Центр уведомлений, часы, календарь.", true),
+        ["TextInputHost.exe"] = new("Сенсорная клавиатура и эмодзи", "Панель ввода текста.", true),
+        ["MsMpEng.exe"] = new("Антивирус Microsoft Defender",
+            "Проверяет файлы. Пики — при установке программ, обновлении баз и плановой проверке.", true),
+        ["MpDefenderCoreService.exe"] = new("Служба Microsoft Defender", "Часть антивируса.", true),
+        ["NisSrv.exe"] = new("Защита сети Defender", "Часть антивируса.", true),
+        ["TiWorker.exe"] = new("Установщик модулей Windows",
+            "Устанавливает обновления. Высокая нагрузка временная — дождитесь окончания.", true),
+        ["TrustedInstaller.exe"] = new("Установщик Windows", "Устанавливает обновления и компоненты.", true),
+        ["MoUsoCoreWorker.exe"] = new("Обновление Windows", "Проверяет и скачивает обновления.", true),
+        ["CompatTelRunner.exe"] = new("Проверка совместимости", "Собирает сведения о совместимости программ. Запускается по расписанию.", true),
+        ["audiodg.exe"] = new("Аудиодвижок Windows",
+            "Обработка звука. Высокая нагрузка обычно из-за звуковых эффектов или «улучшений» в драйвере.", true),
+        ["WmiPrvSE.exe"] = new("Поставщик WMI",
+            "Отвечает программам на вопросы о системе. Нагрузку создаёт не он, а программа, которая часто спрашивает.", true),
+        ["spoolsv.exe"] = new("Диспетчер печати", "Очередь печати.", true),
+        ["dllhost.exe"] = new("Суррогат COM", "Выполняет компоненты других программ, например миниатюры.", true),
+        ["conhost.exe"] = new("Окно консоли", "Обслуживает окна командной строки.", true),
+        ["taskhostw.exe"] = new("Узел задач Windows", "Выполняет фоновые задачи.", true),
+        ["svchost.exe"] = new("Служба Windows", "Контейнер для служб Windows.", true),
+        ["msedgewebview2.exe"] = new("Microsoft Edge WebView2", "Встроенный браузер, на котором сделаны многие программы.", false),
+        ["nvcontainer.exe"] = new("NVIDIA Container", "Фоновые службы драйвера NVIDIA.", false),
+        ["NVDisplay.Container.exe"] = new("NVIDIA Display Container", "Панель управления и службы драйвера NVIDIA.", false),
+        ["NVIDIA Overlay.exe"] = new("Оверлей NVIDIA", "Оверлей NVIDIA App/GeForce Experience. Может нагружать видеокарту в играх.", false),
+        ["NVIDIA Share.exe"] = new("Оверлей NVIDIA", "Оверлей GeForce Experience. Может нагружать видеокарту в играх.", false),
+        ["RadeonSoftware.exe"] = new("AMD Software", "Панель драйвера AMD.", false),
+        ["wallpaper32.exe"] = new("Wallpaper Engine", "Живые обои. Нагружают видеокарту, если не стоят на паузе во время игры.", false),
+        ["wallpaper64.exe"] = new("Wallpaper Engine", "Живые обои. Нагружают видеокарту, если не стоят на паузе во время игры.", false),
+        ["Lively.exe"] = new("Lively Wallpaper", "Живые обои. Нагружают видеокарту во время игры.", false),
+        ["GameBar.exe"] = new("Игровая панель Xbox", "Оверлей Win+G.", false),
+        ["RTSS.exe"] = new("RivaTuner Statistics Server", "Оверлей и ограничитель кадров.", false),
+        ["steamwebhelper.exe"] = new("Steam (встроенный браузер)", "Интерфейс Steam.", false),
+    };
+
+    public static KnownProcess? Find(string name) => Map.TryGetValue(name, out var k) ? k : null;
+}

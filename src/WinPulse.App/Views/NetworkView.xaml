@@ -1,0 +1,45 @@
+<UserControl x:Class="WinPulse.App.Views.NetworkView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinPulse.App.ViewModels"
+             xmlns:c="clr-namespace:WinPulse.App.Controls">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="28,24,28,28">
+            <TextBlock Text="Сеть" Style="{StaticResource H1}"/>
+            <TextBlock Text="Скорость по каждому подключению. Какие программы качают и отправляют — появится на следующих этапах (нужна трассировка событий Windows)."
+                       Style="{StaticResource FaintText}" Margin="0,4,0,18" TextWrapping="Wrap"/>
+            <TextBlock Text="Активных сетевых подключений нет." Style="{StaticResource MutedText}"
+                       Visibility="{Binding Empty, Converter={StaticResource BoolToVis}}"/>
+
+            <ItemsControl ItemsSource="{Binding Adapters}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:NetCardVm}">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="240"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource H2}"/>
+                                    <TextBlock Text="{Binding Description}" Style="{StaticResource FaintText}" Margin="0,2,0,10"/>
+                                    <c:AreaChart Height="120" Values="{Binding RxChart}" Values2="{Binding TxChart}" Capacity="120"
+                                                 MinimumScale="131072" ShowGrid="True" GridBrush="{StaticResource Line}"
+                                                 Stroke="{StaticResource Series.Net}" Stroke2="{StaticResource Series.Net2}"/>
+                                    <TextBlock Text="за 2 минуты" Style="{StaticResource FaintText}" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="ПРИЁМ" Style="{StaticResource Caption}" Foreground="{StaticResource Series.Net}"/>
+                                    <TextBlock Text="{Binding Rx}" Style="{StaticResource Big}" Margin="0,2,0,12"/>
+                                    <TextBlock Text="ОТПРАВКА" Style="{StaticResource Caption}" Foreground="{StaticResource Series.Net2}"/>
+                                    <TextBlock Text="{Binding Tx}" Style="{StaticResource Big}" Margin="0,2,0,12"/>
+                                    <TextBlock Text="{Binding Speed}" Style="{StaticResource FaintText}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

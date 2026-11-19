@@ -1,0 +1,2 @@
+# build.cmd is CP866 + CRLF on purpose; keep the bytes as they are
+*.cmd -text

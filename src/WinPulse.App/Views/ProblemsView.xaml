@@ -1,0 +1,224 @@
+<UserControl x:Class="WinPulse.App.Views.ProblemsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinPulse.App.ViewModels"
+             xmlns:c="clr-namespace:WinPulse.App.Controls"
+             xmlns:i="clr-namespace:WinPulse.App.Infrastructure">
+    <UserControl.Resources>
+        <Style x:Key="LevelDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Fill" Value="{StaticResource Good}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Level}" Value="info">
+                    <Setter Property="Fill" Value="{StaticResource Accent}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}" Value="warn">
+                    <Setter Property="Fill" Value="{StaticResource Warn}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Level}" Value="bad">
+                    <Setter Property="Fill" Value="{StaticResource Bad}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="28,24,28,28" MaxWidth="1100" HorizontalAlignment="Stretch">
+            <TextBlock Text="Проблемы" Style="{StaticResource H1}"/>
+            <TextBlock Text="Журналы Windows за 30 дней, устройства и диски — что случалось, что это значит и что делать. Ничего не меняется: WinPulse только читает."
+                       Style="{StaticResource MutedText}" Margin="0,6,0,18"/>
+
+            <!-- Итог -->
+            <Border Style="{StaticResource Card}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,16,0">
+                        <TextBlock Text="{Binding Summary}" Style="{StaticResource H2}" FontSize="17" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding LastScan}" Style="{StaticResource FaintText}" Margin="0,4,0,0"/>
+                        <TextBlock Text="{Binding BusyText}" Foreground="{StaticResource Accent}" Margin="0,8,0,0"
+                                   Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+                        <ItemsControl ItemsSource="{Binding Notes}" Margin="0,8,0,0"
+                                      Visibility="{Binding HasNotes, Converter={StaticResource BoolToVis}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Style="{StaticResource FaintText}" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                        <Button Style="{StaticResource BtnPrimary}" Padding="16,8" Command="{Binding ScanCommand}" Content="Проверить снова"/>
+                        <Button Style="{StaticResource Btn}" Margin="0,8,0,0" Command="{Binding SaveReportCommand}" Content="Сохранить отчёт"/>
+                        <Button Style="{StaticResource BtnGhost}" Margin="0,6,0,0" HorizontalAlignment="Center"
+                                Command="{Binding OpenReliabilityCommand}" Content="Монитор стабильности"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Хронология -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="ХРОНОЛОГИЯ ЗА 30 ДНЕЙ" Style="{StaticResource Caption}"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Border Width="9" Height="9" CornerRadius="2" Background="{StaticResource Bad}" VerticalAlignment="Center"/>
+                            <TextBlock Text="критично" Style="{StaticResource FaintText}" Margin="5,0,12,0"/>
+                            <Border Width="9" Height="9" CornerRadius="2" Background="{StaticResource Warn}" VerticalAlignment="Center"/>
+                            <TextBlock Text="ошибки" Style="{StaticResource FaintText}" Margin="5,0,12,0"/>
+                            <Border Width="9" Height="9" CornerRadius="2" Background="{StaticResource Yellow}" VerticalAlignment="Center"/>
+                            <TextBlock Text="предупреждения" Style="{StaticResource FaintText}" Margin="5,0,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                    <c:DaysChart Height="96" Margin="0,12,0,0" Days="{Binding Days}"
+                                 CriticalBrush="{StaticResource Bad}" ErrorBrush="{StaticResource Warn}" WarningBrush="{StaticResource Yellow}"
+                                 EmptyBrush="{StaticResource Line}" LabelBrush="{StaticResource Faint}"/>
+                    <TextBlock Text="{Binding TimelineText}" Style="{StaticResource FaintText}" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Всё хорошо -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0" Background="{StaticResource GoodBg}" BorderBrush="#1F4A30"
+                    Visibility="{Binding NoProblems, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="За 30 дней серьёзных проблем не найдено. Ниже можно посмотреть, что именно проверено."
+                           Foreground="{StaticResource Good}" TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- Находки -->
+            <ItemsControl ItemsSource="{Binding Problems}" Margin="0,16,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:FindingVm}">
+                        <Border x:Name="card" Style="{StaticResource Card}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Ellipse Style="{StaticResource LevelDot}" VerticalAlignment="Top" Margin="2,6,14,0"/>
+                                <StackPanel Grid.Column="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Background="Transparent" Cursor="Hand">
+                                            <StackPanel.InputBindings>
+                                                <MouseBinding MouseAction="LeftClick" Command="{Binding ToggleCommand}"/>
+                                            </StackPanel.InputBindings>
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource H2}" TextWrapping="Wrap"/>
+                                            <TextBlock Style="{StaticResource FaintText}" Margin="0,3,0,0" TextWrapping="Wrap">
+                                                <Run Text="{Binding Category, Mode=OneWay}"/>
+                                                <Run Text="·"/>
+                                                <Run Text="{Binding LevelText, Mode=OneWay}"/>
+                                                <Run Text="·"/>
+                                                <Run Text="{Binding CountText, Mode=OneWay}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <ToggleButton Grid.Column="1" Style="{StaticResource Chevron}" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                                      VerticalAlignment="Top" Margin="8,0,0,0"/>
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+
+                                    <StackPanel Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Margin="0,12,0,0" Visibility="{Binding HasAdvice, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="ЧТО ДЕЛАТЬ" Style="{StaticResource Caption}" Margin="0,0,0,6"/>
+                                            <ItemsControl ItemsSource="{Binding Advice}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+
+                                        <Border Background="{StaticResource Bg}" CornerRadius="7" Padding="10,8" Margin="0,10,0,0"
+                                                Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVis}}">
+                                            <StackPanel>
+                                                <TextBlock Text="ЗАПИСИ" Style="{StaticResource Caption}" Margin="0,0,0,4"/>
+                                                <ItemsControl ItemsSource="{Binding Evidence}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock Text="{Binding}" Style="{StaticResource Mono}" Margin="0,0,0,2"/>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <TextBlock Text="{Binding Technical}" Style="{StaticResource Mono}" Foreground="{StaticResource Faint}" Margin="0,8,0,0">
+                                            <TextBlock.Visibility>
+                                                <MultiBinding Converter="{x:Static i:AllTrueToVisibility.Instance}">
+                                                    <Binding Path="ProMode" Source="{x:Static i:UiState.I}"/>
+                                                    <Binding Path="Technical" Converter="{StaticResource NotNull}"/>
+                                                </MultiBinding>
+                                            </TextBlock.Visibility>
+                                        </TextBlock>
+
+                                        <ItemsControl ItemsSource="{Binding Actions}" Margin="0,10,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type vm:FindingActionVm}">
+                                                    <Button Style="{StaticResource Btn}" Padding="10,5" Margin="0,0,8,6"
+                                                            Content="{Binding Label}" Command="{Binding Command}"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Level}" Value="bad">
+                                <Setter TargetName="card" Property="BorderBrush" Value="#5A2A2A"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Level}" Value="warn">
+                                <Setter TargetName="card" Property="BorderBrush" Value="#4A3A22"/>
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Пройденные проверки -->
+            <Button Style="{StaticResource BtnGhost}" HorizontalAlignment="Left" Margin="0,4,0,8" Command="{Binding TogglePassedCommand}">
+                <TextBlock Text="{Binding PassedToggleText}"/>
+            </Button>
+            <ItemsControl ItemsSource="{Binding Passed}" Visibility="{Binding ShowPassed, Converter={StaticResource BoolToVis}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:FindingVm}">
+                        <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1"
+                                CornerRadius="8" Padding="12,9" Margin="0,0,0,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Ellipse Style="{StaticResource LevelDot}" VerticalAlignment="Top" Margin="0,5,12,0" Width="8" Height="8"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Summary}" Style="{StaticResource FaintText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                    <ItemsControl ItemsSource="{Binding Evidence}" Margin="0,4,0,0"
+                                                  Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVis}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" Style="{StaticResource FaintText}" TextWrapping="Wrap"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
