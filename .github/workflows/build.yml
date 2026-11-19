@@ -129,6 +129,7 @@ jobs:
             $top = ($r.Drivers | Select-Object -First 8 | ForEach-Object { "$($_.Name) dpc=$($_.DpcCount) isr=$($_.IsrCount) max=$([math]::Round($_.MaxUs))" }) -join ' | '
             Write-Output "::notice title=Latency drivers::$top"
             Write-Output "::notice title=Latency histogram::$($r.Histogram -join ',')"
+            Write-Output "::notice title=Latency debug::$($r.Debug)"
           } else {
             Write-Output "::warning title=Latency::no json"
           }

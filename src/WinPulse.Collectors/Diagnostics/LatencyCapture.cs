@@ -60,7 +60,9 @@ public static unsafe class LatencyCapture
         if (IntPtr.Size != 8) throw new PlatformNotSupportedException("x64 only");
         var agg = new LatencyAggregator();
         double freq = Stopwatch.Frequency;
-        int dcStart = 0;
+        int dcStart = 0, imageEvents = 0;
+        string? firstImage = null;
+        var firstRoutines = new List<ulong>();
 
         // Обработчик событий: держим ссылку на делегат до конца замера, иначе сборщик мусора его уберёт.
         EventRecordCallback callback = record =>
@@ -83,11 +85,16 @@ public static unsafe class LatencyCapture
                     bool isr = KernelEvents.IsIsr(opcode);
                     if (!isr && !KernelEvents.IsDpc(opcode)) return;
                     if (!KernelEvents.TryParseDpc(span, p64, out long initial, out ulong routine)) return;
+                    if (firstRoutines.Count < 3) firstRoutines.Add(routine);
                     agg.Add(isr, routine, (timestamp - initial) * 1_000_000.0 / freq);
                 }
-                else if (provider == KernelEvents.Image && opcode is KernelEvents.OpImageDcStart or KernelEvents.OpImageLoad)
+                else if (provider == KernelEvents.Image)
                 {
-                    if (KernelEvents.TryParseImage(span, p64, out ulong imageBase, out ulong size, out uint pid, out string file) &&
+                    imageEvents++;
+                    if (opcode is not (KernelEvents.OpImageDcStart or KernelEvents.OpImageLoad)) return;
+                    bool parsed = KernelEvents.TryParseImage(span, p64, out ulong imageBase, out ulong size, out uint pid, out string file);
+                    firstImage ??= $"op{opcode} len{length} pid{pid} base{imageBase:X} {file}";
+                    if (parsed &&
                         (pid == 0 || imageBase >= KernelSpace))
                     {
                         agg.AddModule(imageBase, size, file);
@@ -161,11 +168,13 @@ public static unsafe class LatencyCapture
         if (dcStart == 0)
         {
             // Список модулей ядра не пришёл из ETW — берём адреса драйверов у psapi.
+            EnableDebugPrivilege();
             AddDriversFromPsapi(agg);
             source = "psapi";
         }
         // Обработчик ещё мог успеть отработать после агрегирования — отчёт строим один раз в конце.
         var report = agg.Build(watch.Elapsed.TotalSeconds, lost, source);
+        report.Debug = $"image events {imageEvents}, first: {firstImage ?? "-"}; routines: {string.Join(" ", firstRoutines.Select(r => r.ToString("X")))}; modules: {agg.DebugRange()}";
         if (report.DpcCount + report.IsrCount > 0 && agg.ModuleCount == 0)
             report.Error = Lang.T("Не удалось узнать адреса драйверов — имена не определены.", "Couldn't resolve driver addresses — names are unknown.");
         return report;
@@ -185,6 +194,52 @@ public static unsafe class LatencyCapture
         Marshal.WriteInt32(props, 68, 1);                                    // FlushTimer, с
         Marshal.WriteInt32(props, 72, unchecked((int)(EVENT_TRACE_FLAG_DPC | EVENT_TRACE_FLAG_INTERRUPT | EVENT_TRACE_FLAG_IMAGE_LOAD)));
         Marshal.WriteInt32(props, 116, PropertiesSize);                      // LoggerNameOffset
+    }
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "LookupPrivilegeValueW")]
+    private static extern bool LookupPrivilegeValue(string? system, string name, out long luid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TokenPrivilege newState, int length, IntPtr previous, IntPtr returnLength);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    private struct TokenPrivilege
+    {
+        public int Count;
+        public long Luid;
+        public int Attributes;
+    }
+
+    /// <summary>
+    /// С Windows 11 24H2 адреса модулей ядра отдаются только процессу с включённой привилегией отладки
+    /// (у администратора она есть, но выключена). Включаем её только в своём процессе-помощнике.
+    /// </summary>
+    private static void EnableDebugPrivilege()
+    {
+        try
+        {
+            if (!OpenProcessToken(System.Diagnostics.Process.GetCurrentProcess().Handle, 0x0020 | 0x0008, out IntPtr token)) return;
+            try
+            {
+                if (!LookupPrivilegeValue(null, "SeDebugPrivilege", out long luid)) return;
+                var tp = new TokenPrivilege { Count = 1, Luid = luid, Attributes = 0x2 };
+                AdjustTokenPrivileges(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+            }
+            finally
+            {
+                CloseHandle(token);
+            }
+        }
+        catch (Exception ex)
+        {
+            Diag.Report("debug privilege", ex);
+        }
     }
 
     private static void AddDriversFromPsapi(LatencyAggregator agg)

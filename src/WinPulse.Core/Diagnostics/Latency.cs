@@ -40,6 +40,8 @@ public sealed class LatencyReport
     public long[] Histogram { get; set; } = [];
     public List<DriverLatency> Drivers { get; set; } = [];
     public string? Error { get; set; }
+    /// <summary>Техническая строка для разбора сбоев (в интерфейсе не показывается).</summary>
+    public string? Debug { get; set; }
 
     public double MaxUs => Math.Max(MaxDpcUs, MaxIsrUs);
     public DriverLatency? Worst => Drivers.OrderByDescending(d => d.MaxUs).FirstOrDefault();
@@ -96,6 +98,16 @@ public sealed class LatencyAggregator
             // Без размера модуль ограничиваем 256 МБ, чтобы адрес в «пустоте» не приписать соседу.
             if (m.End == 0 && address - m.Base > 256UL * 1024 * 1024) return Unknown;
             return m.Name;
+        }
+    }
+
+    public string DebugRange()
+    {
+        lock (_modules)
+        {
+            if (_modules.Count == 0) return "none";
+            var sorted = _modules.OrderBy(m => m.Base).ToList();
+            return $"{_modules.Count}, {sorted[0].Name}@{sorted[0].Base:X} .. {sorted[^1].Name}@{sorted[^1].Base:X}";
         }
     }
 
