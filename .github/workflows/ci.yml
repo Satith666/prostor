@@ -11,6 +11,11 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Опубликовать выпуск этой версии (например 1.2.0); пусто — только проверка"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -93,7 +98,7 @@ jobs:
 
   release:
     name: Выпуск
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release != '')
     needs: windows
     runs-on: ubuntu-latest
     permissions:
@@ -106,7 +111,11 @@ jobs:
       - name: Страница выпуска
         env:
           GH_TOKEN: ${{ github.token }}
+          REL: ${{ inputs.release }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/Prostor-Setup-*.exe \
-            --repo "$GITHUB_REPOSITORY" --title "Prostor ${GITHUB_REF_NAME#v}" \
+          tag="$GITHUB_REF_NAME"
+          [ -n "$REL" ] && tag="v$REL"
+          ls dist/Prostor-Setup-"${tag#v}".exe
+          gh release create "$tag" dist/Prostor-Setup-*.exe --target "$GITHUB_SHA" \
+            --repo "$GITHUB_REPOSITORY" --title "Prostor ${tag#v}" \
             --notes "Установщик проверен автотестами на Windows Server 2025, Windows Server 2022 и Windows 11 ARM."
