@@ -421,11 +421,34 @@ func (s *progSnap) quietCommand() (exe, args string) {
 	if ok, _ := filepath.Match("unins[0-9][0-9][0-9].exe", base); ok {
 		return exe, strings.TrimSpace(args + " /VERYSILENT /SUPPRESSMSGBOXES /NORESTART")
 	}
+	dir := lower(filepath.Base(filepath.Dir(exe)))
+	switch {
+	case base == "helper.exe" && dir == "uninstall": // Mozilla: Firefox, Thunderbird
+		return exe, strings.TrimSpace(args + " /S")
+	case base == "iv_uninstall.exe": // IrfanView
+		return exe, strings.TrimSpace(args + " /silent")
+	case base == "uninstall.exe" && (strings.Contains(dir, "winrar") || strings.Contains(dir, "7-zip")):
+		return exe, strings.TrimSpace(args + " /S")
+	}
 	if isNSIS(exe) {
 		// _?= runs the uninstaller in place, so it can be waited for
 		return exe, strings.TrimSpace(args+" /S") + " _?=" + filepath.Dir(exe)
 	}
+	if strings.Contains(lower(args), "/uninstall") && isBurn(exe) { // WiX bundles
+		return exe, strings.TrimSpace(args + " /quiet /norestart")
+	}
 	return "", ""
+}
+
+func isBurn(exe string) bool {
+	f, err := os.Open(exe)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	buf := make([]byte, 4<<20)
+	n, _ := f.Read(buf)
+	return bytes.Contains(buf[:n], []byte("WixBundle")) || bytes.Contains(buf[:n], []byte("WixBurn"))
 }
 
 func isNSIS(exe string) bool {
@@ -940,6 +963,13 @@ func runRemoveProgram() int {
 		return 2
 	}
 	res.Found, res.Program = true, best.Name
+	// an automated run cannot answer an uninstaller's questions
+	if snap, err := findProgram(best.Key); err == nil {
+		if exe, _ := snap.quietCommand(); exe == "" {
+			res.Error = "у программы нет тихого удаления: " + snap.Uninstall
+			return 1
+		}
+	}
 	j := newTestJob()
 	rep, err := uninstallJob(j, best.Key, true)
 	if err != nil {

@@ -64,14 +64,24 @@ function IsNoise([string]$item) {
 
 $before = Snapshot
 $entriesBefore = Entries
+$testStart = Get-Date
 
 # --- установка
 $installed = @()
 foreach ($pkg in $packages) {
     Write-Host "== установка $pkg"
-    $p = Start-Process choco -ArgumentList @('install', $pkg, '-y', '--no-progress', '--limit-output', '--ignore-checksums') -PassThru -NoNewWindow -Wait
+    # не -Wait: он ждёт и программы, которые установщик запустил после себя (Greenshot)
+    $p = Start-Process choco -ArgumentList @('install', $pkg, '-y', '--no-progress', '--limit-output', '--ignore-checksums') -PassThru -NoNewWindow
+    $null = $p.Handle
+    if (-not $p.WaitForExit(10 * 60 * 1000)) { $p.Kill(); Write-Warning "$pkg не установился за 10 минут"; continue }
     if ($p.ExitCode -eq 0) { $installed += $pkg } else { Write-Warning "$pkg не установился ($($p.ExitCode))" }
 }
+# программы, запущенные установщиками, закрываются: иначе их файлы заняты
+$appDirs = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, "$env:LOCALAPPDATA\Programs", $env:APPDATA, $env:LOCALAPPDATA) | Where-Object { $_ }
+Get-Process | Where-Object { $_.Path -and $_.Path -notmatch 'chocolatey|prostor' } |
+    Where-Object { $path = $_.Path; @($appDirs | Where-Object { $path.StartsWith($_ + '\', [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0 } |
+    Where-Object { $_.StartTime -gt $testStart } |
+    ForEach-Object { Write-Host "   закрыта запущенная установщиком программа: $($_.Path)"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 $entriesAfter = Entries
 $new = @{}
 foreach ($k in $entriesAfter.Keys) { if (-not $entriesBefore.ContainsKey($k)) { $new[$k] = $entriesAfter[$k] } }
@@ -107,7 +117,7 @@ foreach ($e in ($new.GetEnumerator() | Sort-Object Value)) {
     $json = "$PWD\reports\uninstall-$safe.json"
     $p = Start-Process -FilePath $App -ArgumentList @('--remove-program', "`"$name`"", '--json', "`"$json`"") -PassThru -NoNewWindow
     $null = $p.Handle
-    if (-not $p.WaitForExit(15 * 60 * 1000)) { $p.Kill(); Write-Warning "${name}: удаление не уложилось в 15 минут"; continue }
+    if (-not $p.WaitForExit(10 * 60 * 1000)) { $p.Kill(); Write-Warning "${name}: удаление не уложилось в 10 минут"; continue }
     $r = if (Test-Path $json) { Get-Content $json -Raw | ConvertFrom-Json } else { $null }
     $ok = $r -and $r.report -and $r.report.removed
     if ($ok) { $removed++ }
