@@ -147,26 +147,6 @@ func splitCommand(s string) (string, string) {
 	return s, ""
 }
 
-func uninstallProgram(key string) error {
-	programsMu.Lock()
-	var prog *Program
-	for i := range programsCache {
-		if programsCache[i].Key == key {
-			p := programsCache[i]
-			prog = &p
-		}
-	}
-	programsMu.Unlock()
-	if prog == nil {
-		return errors.New("программа не найдена — обновите список")
-	}
-	exe, args := splitCommand(winapi.ExpandEnv(prog.Uninstall))
-	if exe == "" {
-		return errors.New("у программы нет команды удаления")
-	}
-	return winapi.ShellRun(exe, args)
-}
-
 // ---------------------------------------------------------------- startup items
 
 type StartupItem struct {

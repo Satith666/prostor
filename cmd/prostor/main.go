@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	version = "1.4.0"
+	version = "1.5.0"
 	exePath string
 	isAdmin bool
 	ui      *webui.Server
@@ -55,6 +55,9 @@ func main() {
 
 	if hasArg("--helper") {
 		os.Exit(runHelper())
+	}
+	if hasArg("--remove-program") {
+		os.Exit(runRemoveProgram())
 	}
 	if hasArg("--bait-test") {
 		os.Exit(runBaitTest())

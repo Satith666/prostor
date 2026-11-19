@@ -2,7 +2,7 @@
 # Собирает Prostor.exe и установщик Prostor-Setup-<версия>.exe (Windows x64).
 set -euo pipefail
 cd "$(dirname "$0")"
-VER=${VER:-1.4.0}
+VER=${VER:-1.5.0}
 export GOOS=windows GOARCH=amd64 CGO_ENABLED=0
 LD="-s -w -H windowsgui -X main.version=$VER"
 mkdir -p build cmd/setup/payload

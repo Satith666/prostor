@@ -632,3 +632,89 @@ func TestExifThumb(t *testing.T) {
 		t.Fatalf("thumbnail not found (%d bytes)", len(got))
 	}
 }
+
+func TestProgramNames(t *testing.T) {
+	cases := map[string]string{
+		"7-Zip 24.08 (x64)":        "7-Zip",
+		"Notepad++ (64-bit x64)":   "Notepad++",
+		"VLC media player":         "VLC media player",
+		"Mozilla Firefox (x64 ru)": "Mozilla Firefox",
+		"WinSCP 6.3.5":             "WinSCP",
+		"Audacity 3.6.4":           "Audacity",
+		"Microsoft Visual C++ 2015-2022 Redistributable (x64) - 14.40.33810": "Microsoft Visual C++ 2015-2022 Redistributable",
+	}
+	for in, want := range cases {
+		if got := baseName(in); got != want {
+			t.Errorf("baseName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	f := nameForms("VLC media player", "VideoLAN")
+	if !f["vlc"] || !f["vlcmediaplayer"] {
+		t.Errorf("VLC forms: %v", f)
+	}
+	f = nameForms("Mozilla Firefox (x64 ru)", "Mozilla")
+	if !f["firefox"] || !f["mozillafirefox"] || f["mozilla"] {
+		t.Errorf("Firefox forms: %v", f)
+	}
+	if nameKey("Notepad++") != "notepad" || nameKey("Яндекс.Музыка") != "яндексмузыка" {
+		t.Error("nameKey")
+	}
+}
+
+// Leftover folders: the program's own folders and folders named after it are
+// found; a shared publisher folder with another program inside stays.
+func TestFindLeftoverFolders(t *testing.T) {
+	root := isolate(t)
+	pf := filepath.Join(root, "Program Files")
+	pd := filepath.Join(root, "ProgramData")
+	t.Setenv("ProgramFiles", pf)
+	t.Setenv("ProgramData", pd)
+	mk := func(p string) {
+		if err := writeTestFile(filepath.Join(p, "f.dat"), 100, 1, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	la, ra := os.Getenv("LOCALAPPDATA"), os.Getenv("APPDATA")
+	mk(filepath.Join(pf, "VideoLAN", "VLC"))        // install folder
+	mk(filepath.Join(ra, "vlc"))                    // settings
+	mk(filepath.Join(la, "VideoLAN", "VLC"))        // publisher\program
+	mk(filepath.Join(pf, "VideoLAN", "Other Tool")) // another program of the publisher
+	mk(filepath.Join(ra, "Microsoft"))              // shared
+	mk(filepath.Join(pd, "Unrelated"))
+	s := &progSnap{Program: Program{Key: "HKLM\\x", Name: "VLC media player", Publisher: "VideoLAN"},
+		forms: nameForms("VLC media player", "VideoLAN"), pubKey: nameKey("VideoLAN"),
+		dirs: []string{filepath.Join(pf, "VideoLAN", "VLC")}}
+	got := map[string]string{}
+	for _, l := range findLeftovers(s) {
+		got[l.Path] = l.Sure + " " + l.Why
+	}
+	for _, want := range []string{filepath.Join(pf, "VideoLAN", "VLC"), filepath.Join(ra, "vlc"), filepath.Join(la, "VideoLAN", "VLC"), filepath.Join(la, "VideoLAN")} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("not found: %s (got %v)", want, got)
+		}
+	}
+	for _, bad := range []string{filepath.Join(pf, "VideoLAN"), filepath.Join(pf, "VideoLAN", "Other Tool"), filepath.Join(ra, "Microsoft"), filepath.Join(pd, "Unrelated")} {
+		if why, ok := got[bad]; ok {
+			t.Errorf("must stay: %s (%s)", bad, why)
+		}
+	}
+}
+
+// .lnk targets are read without the shell.
+func TestLnkTarget(t *testing.T) {
+	// header (76 bytes) + LinkInfo with a local base path, no ID list
+	target := `C:\Program Files\App\app.exe`
+	b := make([]byte, 0x4C)
+	binary.LittleEndian.PutUint32(b, 0x4C)
+	binary.LittleEndian.PutUint32(b[0x14:], 2) // HasLinkInfo
+	li := make([]byte, 0x1C)
+	binary.LittleEndian.PutUint32(li[4:], 0x1C)    // header size
+	binary.LittleEndian.PutUint32(li[0x10:], 0x1C) // local base path offset
+	li = append(li, append([]byte(target), 0)...)
+	binary.LittleEndian.PutUint32(li, uint32(len(li)))
+	p := filepath.Join(t.TempDir(), "App.lnk")
+	os.WriteFile(p, append(b, li...), 0o644)
+	if got := lnkTarget(p); got != target {
+		t.Fatalf("lnk target %q", got)
+	}
+}

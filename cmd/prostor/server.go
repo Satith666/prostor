@@ -600,14 +600,44 @@ func routes() http.Handler {
 		}
 		ok(w)
 	})
+	// remove a program: its uninstaller (silent if possible), then the search for leftovers
 	post("/api/programs/uninstall", func(w http.ResponseWriter, r *http.Request) {
-		var req struct{ Key string }
+		var req struct {
+			Key   string
+			Quiet bool
+		}
 		readJSON(r, &req)
-		if err := uninstallProgram(req.Key); err != nil {
+		if _, err := startJob("uninstall", func(j *Job) (any, error) { return uninstallJob(j, req.Key, req.Quiet) }); err != nil {
 			writeErr(w, err)
 			return
 		}
 		ok(w)
+	})
+	// the user closed an interactive uninstaller
+	post("/api/programs/continue", func(w http.ResponseWriter, r *http.Request) {
+		uninstallWait.Lock()
+		if uninstallWait.done != nil {
+			select {
+			case <-uninstallWait.done:
+			default:
+				close(uninstallWait.done)
+			}
+		}
+		uninstallWait.Unlock()
+		ok(w)
+	})
+	post("/api/programs/leftovers", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Key string
+			IDs []int
+		}
+		readJSON(r, &req)
+		res, err := removeLeftovers(req.Key, req.IDs)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		writeJSON(w, res)
 	})
 	get("/api/startup", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, listStartup()) })
 	post("/api/startup/toggle", func(w http.ResponseWriter, r *http.Request) {

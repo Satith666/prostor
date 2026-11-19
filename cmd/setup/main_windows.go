@@ -35,7 +35,7 @@ var checkScript []byte
 
 const checkName = "Проверка Prostor"
 
-var version = "1.4.0"
+var version = "1.5.0"
 
 const (
 	appName      = "Prostor"

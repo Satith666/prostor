@@ -22,10 +22,10 @@
 Нужны Go 1.24+ и Python 3 с Pillow (Windows, Linux или macOS):
 
 ```
-VER=1.4.0 ./build.sh
+VER=1.5.0 ./build.sh
 ```
 
-Результат — `build/Prostor.exe` (можно запускать без установки) и `build/Prostor-Setup-1.4.0.exe`.
+Результат — `build/Prostor.exe` (можно запускать без установки) и `build/Prostor-Setup-1.5.0.exe`.
 
 ## Анализ диска
 - Целый диск NTFS с правами администратора читается из таблицы файлов (MFT) одним проходом; без прав и на других дисках — обходом папок.
@@ -66,5 +66,5 @@ VER=1.4.0 ./build.sh
 ## Полезное
 - Журнал работы: `%LOCALAPPDATA%\Prostor\prostor.log`
 - Настройки и история: `%LOCALAPPDATA%\Prostor\settings.json`, `history.json`
-- Тихая установка: `Prostor-Setup-1.4.0.exe /S` (папку можно задать `/D=C:\Путь`)
+- Тихая установка: `Prostor-Setup-1.5.0.exe /S` (папку можно задать `/D=C:\Путь`)
 - Удаление: «Параметры → Приложения» или `Prostor.exe --uninstall`

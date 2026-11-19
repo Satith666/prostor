@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: "Опубликовать выпуск этой версии (например 1.4.0); пусто — только проверка"
+        description: "Опубликовать выпуск этой версии (например 1.5.0); пусто — только проверка"
         required: false
         default: ""
 
@@ -96,10 +96,34 @@ jobs:
           name: reports-${{ matrix.os }}
           path: reports/
 
+  programs:
+    name: Удаление 20 программ без остатков
+    needs: build
+    runs-on: windows-2025
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: prostor-build
+          path: dist
+      - name: Установка, запуск и удаление программ
+        run: ./ci/uninstall-test.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-programs
+          path: reports/
+
   release:
     name: Выпуск
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release != '')
-    needs: windows
+    needs: [windows, programs]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -118,4 +142,4 @@ jobs:
           ls dist/Prostor-Setup-"${tag#v}".exe
           gh release create "$tag" dist/Prostor-Setup-*.exe --target "$GITHUB_SHA" \
             --repo "$GITHUB_REPOSITORY" --title "Prostor ${tag#v}" \
-            --notes "Установщик проверен автотестами на Windows Server 2025, Windows Server 2022 и Windows 11 ARM."
+            --notes "Установщик проверен автотестами на Windows Server 2025, Windows Server 2022 и Windows 11 ARM, включая удаление 20 популярных программ без остатков."
