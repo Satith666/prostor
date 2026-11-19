@@ -393,5 +393,5 @@ func w2Desc(locs []Loc) string {
 		s = s[:i] + " и " + s[i+2:]
 	}
 	r := []rune(s)
-	return strings.ToUpper(string(r[:1])) + string(r[1:]) + " программы. Правило из базы Winapp2, проверенное фильтром безопасности Prostor."
+	return strings.ToUpper(string(r[:1])) + string(r[1:]) + " программы."
 }

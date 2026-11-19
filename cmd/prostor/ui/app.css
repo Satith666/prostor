@@ -87,7 +87,15 @@ svg.i .b { fill: currentColor; stroke: none; }
 .mark .f { stroke: var(--klein); }
 .word { font: 400 23px/1 var(--f-num); letter-spacing: .01em; }
 
+/* режим: один переключатель на всё окно */
+.mode { display: grid; grid-template-columns: 1fr 1fr; margin: 0 4px 18px; padding: 3px; border-radius: 8px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--rail-line); }
+.mode button { border: 0; background: none; height: 28px; border-radius: 6px; font-size: 12.5px; color: var(--ink-2); }
+.mode button:hover { color: var(--ink); }
+.mode button.on { background: var(--panel); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--panel-line); }
+.mode button:focus-visible { outline: 2px solid var(--klein); outline-offset: 1px; }
+
 #nav { display: flex; flex-direction: column; gap: 2px; overflow: auto; min-height: 0; }
+#nav a[hidden], #nav .gap[hidden] { display: none; }
 #nav .gap { height: 14px; flex: none; }
 #nav a {
   display: flex; align-items: center; gap: 12px; height: 38px; padding: 0 12px; border-radius: 6px;
@@ -267,6 +275,19 @@ select.input { padding-right: 28px; }
 .item .sz { text-align: right; font: 400 15px var(--f-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .item .sz small { display: block; font: 12px var(--f-ui); color: var(--ink-3); margin-top: 2px; }
 .item .sz.zero { color: var(--ink-3); }
+/* программы из базы Winapp2: одна строка в простом режиме */
+.item.grp .linkbtn { margin-top: 6px; font-size: 12.5px; }
+.sublist { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 2px 18px; max-width: 760px; }
+.sublist .sub { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 28px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.sublist .sub span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sublist .sub em { font: 400 12px var(--f-num); font-style: normal; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+/* «Эксперт»: папки правила */
+details.where { margin-top: 8px; font-size: 12.5px; }
+details.where summary { color: var(--klein); cursor: pointer; width: max-content; }
+details.where summary:hover { text-decoration: underline; }
+details.where ul { list-style: none; margin: 6px 0 0; padding: 8px 10px; border-radius: 6px; background: var(--fill); display: grid; gap: 3px; max-width: 760px; }
+details.where li.path { font: 12px/1.45 var(--f-mono, ui-monospace, Consolas, monospace); color: var(--ink-2); overflow-wrap: anywhere; }
+.head .acts .input.sm { height: 32px; width: 240px; }
 .item.off .t, .item.off .sz { opacity: .5; }
 .item .warnline { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; color: var(--ink); }
 .item .warnline svg.i { width: 16px; height: 16px; }
@@ -458,7 +479,7 @@ tr:hover .ra, tr:focus-within .ra, .ra:focus-within { opacity: 1; }
 
 @media (max-width: 980px) {
   .app { grid-template-columns: 64px minmax(0, 1fr); }
-  .brand .word, #nav a span, #nav a .meta, .rail-foot { display: none; }
+  .brand .word, #nav a span, #nav a .meta, .rail-foot, .mode { display: none; }
   .brand { padding: 0 10px 22px; }
   #nav a { justify-content: center; padding: 0; }
   .page { padding: 32px 28px 48px; }

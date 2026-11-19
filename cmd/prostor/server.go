@@ -125,18 +125,43 @@ func routes() http.Handler {
 	get("/api/clean/targets", func(w http.ResponseWriter, r *http.Request) {
 		s := getSettings()
 		type tv struct {
-			Target
+			*Target
 			Checked bool `json:"checked"`
 		}
 		var list []tv
-		for _, t := range targets {
+		imported := 0
+		for _, t := range offered(newDirCache()) {
 			c := t.Default
 			if v, ok := s.Selected[t.ID]; ok {
 				c = v
 			}
+			if t.Source != "" {
+				imported++
+			}
 			list = append(list, tv{t, c})
 		}
-		writeJSON(w, map[string]any{"categories": categories, "targets": list, "admin": isAdmin})
+		writeJSON(w, map[string]any{"categories": categories, "targets": list, "admin": isAdmin,
+			"rules": map[string]any{"builtin": rulesInfo.Builtin, "imported": rulesInfo.Imported, "installed": imported,
+				"w2Version": rulesInfo.W2Version, "w2Notice": rulesInfo.W2Notice}})
+	})
+	// files a program kept open during the last cleaning: delete at restart
+	post("/api/clean/reboot", func(w http.ResponseWriter, r *http.Request) {
+		if !isAdmin {
+			writeErr(w, errors.New("нужны права администратора"))
+			return
+		}
+		n, failed := 0, 0
+		jr := openJournal("reboot")
+		for _, p := range lastLocked() {
+			if winapi.DeleteOnReboot(p) == nil {
+				n++
+				jr.add("s", p, 0, "reboot")
+			} else {
+				failed++
+			}
+		}
+		jr.close()
+		writeJSON(w, map[string]int{"scheduled": n, "failed": failed})
 	})
 	post("/api/clean/select", func(w http.ResponseWriter, r *http.Request) {
 		var req struct{ Selected map[string]bool }

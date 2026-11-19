@@ -102,7 +102,7 @@ const LEVELS = { critical: [4, 'Важно'], high: [3, 'Желательно'],
 // ============================================================ состояние
 const S = {
   info: null, settings: null, sep: '\\', page: '',
-  cats: [], targets: null, scan: {}, scanAt: 0, scanning: false, cleaning: false, closed: new Set(['privacy', 'dev']),
+  cats: [], targets: null, scan: {}, scanAt: 0, scanning: false, cleaning: false, closed: new Set(['privacy', 'dev']), openGrp: new Set(), cleanQ: '', rules: null,
   heroDrive: null, freed: 0, animated: false,
   advice: null, advising: false,
   folders: null, an: null, du: null, duMin: 0, pr: null, st: null, tools: null, hist: null, schedDraft: null,
@@ -207,11 +207,33 @@ const NAV = [
   ['history', 'История'], ['quarantine', 'Карантин'], ['settings', 'Настройки'],
 ];
 const PAGES = {};
+// Простой режим: пять разделов и только безопасные пункты. «Эксперт» — всё.
+const SIMPLE_NAV = new Set(['overview', 'clean', 'analyze', 'programs', 'settings']);
+const expertMode = () => !!(S.settings && S.settings.expert);
 
 function buildNav() {
   $('#nav').innerHTML = NAV.map((n) => (n ? `<a href="#${n[0]}" data-p="${n[0]}">${ic(n[0])}<span>${n[1]}</span><em class="meta"></em></a>` : '<div class="gap"></div>')).join('');
 }
+function syncMode() {
+  const ex = expertMode();
+  for (const b of $$('#modeSw button')) {
+    const on = (b.dataset.mode === 'expert') === ex;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  const q = S.info && S.info.quarantine > 0;
+  for (const a of $$('#nav a')) a.hidden = !ex && !SIMPLE_NAV.has(a.dataset.p) && !(a.dataset.p === 'quarantine' && q) && a.dataset.p !== S.page;
+  for (const g of $$('#nav .gap')) g.hidden = !ex;
+}
+async function setMode(expert) {
+  if (expertMode() === expert) return;
+  if (await saveSettings({ expert })) {
+    syncMode();
+    render(false);
+  }
+}
 function syncNav() {
+  syncMode();
   for (const a of $$('#nav a')) a.classList.toggle('on', a.dataset.p === S.page);
   const meta = (p, text, hot) => {
     const e = $(`#nav a[data-p="${p}"] .meta`);
@@ -276,6 +298,7 @@ const loadingPage = (t = 'Загрузка…') => `<div class="page"><p class="
 let pageActs = {};
 const COMMON = {
   elevate: () => elevate(),
+  mode: (el) => setMode(el.dataset.mode === 'expert'),
   go: (el) => go(el.dataset.page),
   reveal: (el) => api('/api/fs/reveal', { path: el.dataset.path }).catch((e) => toast(e.message, true)),
   open: (el) => api('/api/fs/open', { path: el.dataset.path }).catch((e) => toast(e.message, true)),
@@ -314,6 +337,7 @@ async function loadTargets() {
   const d = await api('/api/clean/targets');
   S.cats = d.categories || [];
   S.targets = d.targets || [];
+  S.rules = d.rules || null;
 }
 const targetById = (id) => (S.targets || []).find((t) => t.id === id);
 const usable = (t) => !(t.admin && S.info && !S.info.admin);
@@ -348,7 +372,7 @@ function saveSelection() {
   }, 400);
 }
 
-async function doClean(ids, title) {
+async function doClean(ids, title, again) {
   if (S.cleaning) return;
   const list = ids.map(targetById).filter((t) => t && usable(t));
   if (!list.length) { toast('Нечего очищать', true); return; }
@@ -363,7 +387,7 @@ async function doClean(ids, title) {
   const caution = list.filter((t) => t.risk !== 'safe' && t.id !== 'recycle').map((t) => t.name);
   if (caution.length) notes += note('warn', `Выбраны пункты с пометкой «осторожно»: ${esc(caution.join(', '))}.`);
   if (!title) title = list.length === 1 ? `Очистить «${list[0].name}»?` : total ? `Очистить ${fmtSize(total)}?` : 'Начать очистку?';
-  const ok = await ask(title, `<p>Файлы удаляются насовсем, минуя Корзину. Личные файлы, пароли и история браузеров не затрагиваются. Список удалённого сохранится в разделе «История».</p>
+  const ok = again || await ask(title, `<p>Файлы удаляются насовсем, минуя Корзину. Личные файлы, пароли и история браузеров не затрагиваются. Список удалённого сохранится в разделе «История».</p>
     ${notes}<ul class="reslist">${rows}</ul>${more}`, 'Очистить');
   if (!ok) return;
   S.cleaning = true;
@@ -384,23 +408,57 @@ async function doClean(ids, title) {
   S.hist = null;
   await refreshInfo();
   rerender('overview', 'clean');
-  showCleanResult(res);
+  showCleanResult(res, list.map((t) => t.id));
   runScan().then(() => { if (S.advice) runAdvisor(); });
 }
 
-function showCleanResult(res) {
+// Программы, которые держат файлы: обычные окна и консоли можно закрыть,
+// службы и системные процессы — нет.
+const closableHolders = (hs) => [...new Set((hs || []).filter((h) => [1, 2, 5].includes(h.kind) && h.exe && !/^(explorer|svchost|csrss|winlogon|dwm|system)\.exe$/i.test(h.exe)).map((h) => h.exe))];
+
+function showCleanResult(res, ids) {
   const items = (res.items || []).filter((i) => i.freed > 0 || i.note).slice(0, 8)
     .map((i) => `<li><span>${esc(i.name)}</span><span>${i.freed > 0 ? fmtSize(i.freed) : esc(i.note)}</span></li>`).join('');
   let extra = '';
-  if (res.failed > 0) {
+  const hs = res.holders || [];
+  const names = [...new Set(hs.map((h) => h.app || h.exe).filter(Boolean))];
+  const closable = closableHolders(hs);
+  if (res.locked > 0 && names.length) {
+    extra = note('info', `${nFiles(res.locked)} не удалось удалить: их держат открытыми ${names.length > 1 ? 'программы' : 'программа'} <b>${esc(names.slice(0, 6).join(', '))}</b>${names.length > 6 ? ' и другие' : ''}.`
+      + (res.scheduled > 0 ? ` ${fmtNum(res.scheduled)} удалятся при следующей перезагрузке.` : ''));
+  } else if (res.failed > 0) {
     extra = `<p class="small">${nFiles(res.failed)} пропущено: их держат открытыми запущенные программы или Windows.`;
     if (res.scheduled > 0) extra += ` ${fmtNum(res.scheduled)} удалятся при следующей перезагрузке.`;
     extra += '</p>';
   }
+  const lockBtns = res.locked > 0 && !res.scheduled
+    ? (closable.length && ids ? `<button class="btn" data-v="close">${ic('stop')}Закрыть ${closable.length > 1 ? 'программы' : esc(closable[0].replace(/\.exe$/i, ''))} и повторить</button>` : '')
+      + (S.info && S.info.admin ? `<button class="btn" data-v="reboot">${ic('refresh')}Удалить при перезагрузке</button>` : '')
+    : '';
   const d = openDialog(`<h2>${res.freed > 0 ? 'Очистка завершена' : 'Готово'}</h2><div class="big">${fmtSize(res.freed)}</div>
     <p>Освобождено, удалено ${nFiles(res.files || 0)} ${res.seconds >= 1 ? 'за ' + fmtDur(res.seconds) : 'менее чем за секунду'}.</p>${extra}${items ? `<ul class="reslist">${items}</ul>` : ''}
-    <div class="btns">${res.journal ? `<button class="btn" data-v="j">${ic('journal')}Список удалённых файлов</button>` : ''}<button class="btn primary" data-v="ok">Готово</button></div>`);
-  $$('.btns button', d.el).forEach((b) => { b.onclick = () => { d.close(); if (b.dataset.v === 'j') showJournal(res.journal, 'Удалённые файлы'); }; });
+    <div class="btns">${lockBtns}${res.journal ? `<button class="btn" data-v="j">${ic('journal')}Список удалённых файлов</button>` : ''}<button class="btn primary" data-v="ok">Готово</button></div>`, { wide: !!lockBtns });
+  $$('.btns button', d.el).forEach((b) => {
+    b.onclick = async () => {
+      const v = b.dataset.v;
+      if (v === 'reboot') {
+        b.disabled = true;
+        try {
+          const r = await api('/api/clean/reboot', {});
+          toast(r.scheduled ? `${nFiles(r.scheduled)} удалятся при следующей перезагрузке` : 'Не удалось поставить файлы в очередь');
+        } catch (e) { toast(e.message, true); }
+        d.close();
+        return;
+      }
+      d.close();
+      if (v === 'j') showJournal(res.journal, 'Удалённые файлы');
+      if (v === 'close') {
+        if (!(await ask('Закрыть программы?', `<p>Будут закрыты: ${esc(closable.join(', '))}. Несохранённые данные в них пропадут. Затем очистка повторится.</p>`, 'Закрыть и повторить'))) return;
+        await api('/api/procs/close', { names: closable }).catch((e) => toast(e.message, true));
+        doClean(ids, null, true);
+      }
+    };
+  });
 }
 
 // ============================================================ ЖУРНАЛ УДАЛЕНИЙ
@@ -600,6 +658,17 @@ PAGES.advice = (m) => {
 };
 
 // ============================================================ ОЧИСТКА
+const RISK_HELP = {
+  safe: 'Удаляются кэш, журналы или временные файлы, которые программа создаст заново.',
+  caution: 'Удаление безопасно, но что-то станет заметно: первые запуски медленнее, Корзину не восстановить.',
+  expert: 'Действие необратимо: например, после удаления Windows.old нельзя откатить обновление.',
+};
+function sizeCell(sc) {
+  if (S.scanning && !sc) return '<div class="sz zero">…</div>';
+  if (sc && sc.size > 0) return `<div class="sz">${fmtSize(sc.size)}<small>${nFiles(sc.files)}</small></div>`;
+  if (sc) return '<div class="sz zero">0</div>';
+  return '<div class="sz zero">—</div>';
+}
 function cleanItemHTML(t) {
   const sc = scanOf(t);
   const can = usable(t);
@@ -607,19 +676,42 @@ function cleanItemHTML(t) {
   if (t.admin && !can) tags.push(`<span>${ic('shield')}нужны права</span>`);
   if (t.risk === 'expert') tags.push(`<span class="bad">${ic('warn')}необратимо</span>`);
   else if (t.risk === 'caution') tags.push(`<span>${ic('warn')}осторожно</span>`);
-  let sz = '<div class="sz zero">—</div>';
-  if (S.scanning && !sc) sz = '<div class="sz zero">…</div>';
-  else if (sc && sc.size > 0) sz = `<div class="sz">${fmtSize(sc.size)}<small>${nFiles(sc.files)}</small></div>`;
-  else if (sc) sz = '<div class="sz zero">0</div>';
+  if (t.source && expertMode()) tags.push('<span>Winapp2</span>');
   const run = sc && sc.running && sc.running.length
     ? `<div class="warnline">${ic('info')}<span>Запущено: ${esc(sc.running.join(', '))}. Занятые файлы будут пропущены.</span><button class="btn sm" data-act="closeProcs" data-names="${esc(sc.running.join(','))}">Закрыть программы</button></div>` : '';
+  const where = expertMode() && (t.where || []).length
+    ? `<details class="where"><summary>Папки и правило</summary><p class="small muted">${esc(RISK_HELP[t.risk] || '')}${t.source ? ' Правило из базы Winapp2, проверенное фильтром безопасности Prostor и тестом приманок.' : ''}</p>
+      <ul>${t.where.map((w) => `<li class="path">${ltr(w)}</li>`).join('')}</ul></details>` : '';
   return `<div class="item ${can ? '' : 'off'}" data-id="${t.id}">
     <input type="checkbox" class="ck" data-act="tick" data-id="${t.id}" ${t.checked && can ? 'checked' : ''} ${can ? '' : 'disabled'} aria-label="${esc(t.name)}">
-    <div class="t"><b>${esc(t.name)}</b>${tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}<p>${esc(t.desc)}</p>${run}</div>${sz}</div>`;
+    <div class="t"><b>${esc(t.name)}</b>${tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}<p>${esc(t.desc)}</p>${run}${where}</div>${sizeCell(sc)}</div>`;
+}
+// Программы из базы Winapp2 в простом режиме: одна строка на раздел.
+function groupState(list) {
+  const can = list.filter(usable);
+  const on = can.filter((t) => t.checked);
+  return on.length === 0 ? 'none' : on.length === can.length ? 'all' : 'some';
+}
+function groupHTML(c, imp) {
+  const bySize = imp.slice().sort((a, b) => ((scanOf(b) || {}).size || 0) - ((scanOf(a) || {}).size || 0));
+  const names = bySize.slice(0, 4).map((t) => t.name).join(', ') + (imp.length > 4 ? ` и ещё ${imp.length - 4}` : '');
+  const open = S.openGrp.has(c.id);
+  const sc = S.scanAt || S.scanning ? { size: sum(imp, (t) => (scanOf(t) ? scanOf(t).size : 0)), files: sum(imp, (t) => (scanOf(t) ? scanOf(t).files : 0)) } : null;
+  const sub = open ? `<div class="sublist">${bySize.map((t) => `<label class="sub"><input type="checkbox" class="ck" data-act="tick" data-id="${t.id}" ${t.checked && usable(t) ? 'checked' : ''} ${usable(t) ? '' : 'disabled'}>
+    <span>${esc(t.name)}</span><em>${scanOf(t) && scanOf(t).size > 0 ? fmtSize(scanOf(t).size) : ''}</em></label>`).join('')}</div>` : '';
+  return `<div class="item grp" data-grp="${c.id}">
+    <input type="checkbox" class="ck" data-act="tickGrp" data-cat="${c.id}" ${groupState(imp) === 'all' ? 'checked' : ''} aria-label="Другие программы">
+    <div class="t"><b>Другие программы: ${imp.length}</b><p>Кэш и журналы установленных программ по базе Winapp2: ${esc(names)}.</p>
+      <button class="linkbtn" data-act="toggleGrp" data-cat="${c.id}">${open ? 'Скрыть список' : 'Показать список'}</button>${sub}</div>${sc ? sizeCell(sc) : sizeCell(null)}</div>`;
 }
 function visibleInCat(c) {
   let list = S.targets.filter((t) => t.cat === c.id);
+  if (!expertMode()) list = list.filter((t) => t.risk !== 'expert');
   if (S.scanAt && c.id !== 'system') list = list.filter((t) => !scanOf(t) || scanOf(t).found);
+  // программы из базы показываем, только если у них нашлось что удалить
+  if (S.scanAt) list = list.filter((t) => !t.source || !scanOf(t) || scanOf(t).size > 0);
+  const q = expertMode() && S.cleanQ ? S.cleanQ.toLowerCase() : '';
+  if (q) list = list.filter((t) => (t.name + ' ' + t.desc + ' ' + (t.where || []).join(' ')).toLowerCase().includes(q));
   return list;
 }
 function catState(c) {
@@ -651,6 +743,12 @@ function syncClean() {
     ck.checked = st.state === 'all';
     ck.indeterminate = st.state === 'some';
     $('.cat-head .sz', box).textContent = S.scanAt ? fmtSize(st.size) : '';
+    const g = $('.item.grp > .ck', box);
+    if (g) {
+      const gs = groupState(visibleInCat(c).filter((t) => t.source));
+      g.checked = gs === 'all';
+      g.indeterminate = gs === 'some';
+    }
   }
   const bar = $('#cleanBar');
   if (bar) bar.innerHTML = cleanBar();
@@ -660,28 +758,50 @@ function syncClean() {
 PAGES.clean = (m) => {
   if (!S.targets) { m.innerHTML = loadingPage(); return; }
   const hidden = [];
+  const ex = expertMode();
   const cats = S.cats.map((c) => {
     const list = visibleInCat(c);
-    if (S.scanAt && c.id !== 'system') for (const t of S.targets) if (t.cat === c.id && scanOf(t) && !scanOf(t).found) hidden.push(t.name);
+    if (S.scanAt && c.id !== 'system') for (const t of S.targets) if (t.cat === c.id && !t.source && scanOf(t) && !scanOf(t).found) hidden.push(t.name);
     if (!list.length) return '';
     const st = catState(c);
+    const own = list.filter((t) => !t.source), imp = list.filter((t) => t.source);
+    const rows = own.map(cleanItemHTML).join('') + (imp.length ? (ex ? imp.map(cleanItemHTML).join('') : groupHTML(c, imp)) : '');
     return `<section class="cat ${S.closed.has(c.id) ? 'closed' : ''}" data-cat="${c.id}">
       <div class="cat-head" data-act="toggleCat" data-cat="${c.id}">
         <input type="checkbox" class="ck" data-act="tickCat" data-cat="${c.id}" ${st.state === 'all' ? 'checked' : ''} aria-label="${esc(c.name)}">
         ${ic(CAT_ICON[c.id] || 'folder')}<div class="t"><b>${esc(c.name)}</b><span>${esc(c.desc)}</span></div>
         <span class="sz">${S.scanAt ? fmtSize(st.size) : ''}</span>${ic('down', 'tg')}</div>
-      <div class="list">${list.map(cleanItemHTML).join('')}</div></section>`;
+      <div class="list">${rows}</div></section>`;
   }).join('');
+  const r = S.rules;
+  const rulesLine = r ? `<p class="small faint">Правил очистки: ${fmtNum(r.builtin)} собственных и ${fmtNum(r.imported)} из базы <a href="https://github.com/MoscaDotTo/Winapp2" target="_blank" rel="noopener">Winapp2</a> (CC BY-SA 4.0); к программам этого компьютера подходят ${fmtNum(r.installed)}.${ex ? '' : ' Необратимые пункты видны в режиме «Эксперт».'}</p>` : '';
   m.innerHTML = `<div class="page">
     ${head('Очистка', 'Удаляются только временные файлы, кэш и журналы. Личные файлы, пароли и история браузеров не затрагиваются.',
-      '<button class="btn quiet" data-act="defaults">Рекомендуемые</button><button class="btn quiet" data-act="none">Снять все</button>')}
+      (ex ? `<input class="input sm" id="clQ" type="search" placeholder="Поиск по пунктам и папкам" aria-label="Поиск по пунктам" value="${esc(S.cleanQ || '')}">` : '')
+      + '<button class="btn quiet" data-act="defaults">Рекомендуемые</button><button class="btn quiet" data-act="none">Снять все</button>')}
     ${adminBanner('пункты с пометкой «нужны права» будут пропущены.')}
-    ${cats}
-    ${hidden.length ? `<p class="small faint">Не установлено на этом компьютере: ${esc(hidden.join(', '))}.</p>` : ''}
+    ${cats || (S.cleanQ ? `<div class="empty">${ic('search')}<h3>Ничего не найдено</h3><p>Нет пунктов, похожих на «${esc(S.cleanQ)}».</p></div>` : '')}
+    ${hidden.length && !(ex && S.cleanQ) ? `<p class="small faint">Не установлено на этом компьютере: ${esc(hidden.join(', '))}.</p>` : ''}
+    ${rulesLine}
     <div class="actionbar" id="cleanBar">${cleanBar()}</div></div>`;
   for (const c of S.cats) {
     const ck = $(`.cat[data-cat="${c.id}"] .cat-head .ck`);
     if (ck) ck.indeterminate = catState(c).state === 'some';
+    const g = $(`.cat[data-cat="${c.id}"] .item.grp > .ck`);
+    if (g) g.indeterminate = groupState(visibleInCat(c).filter((t) => t.source)) === 'some';
+  }
+  const qi = $('#clQ');
+  if (qi) {
+    let qt;
+    qi.addEventListener('input', () => {
+      clearTimeout(qt);
+      qt = setTimeout(() => {
+        S.cleanQ = qi.value.trim();
+        render(false);
+        const n = $('#clQ');
+        if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+      }, 200);
+    });
   }
   acts({
     tick: (el) => { targetById(el.dataset.id).checked = el.checked; saveSelection(); syncClean(); },
@@ -693,6 +813,20 @@ PAGES.clean = (m) => {
       for (const box of $$(`.cat[data-cat="${c.id}"] .item .ck`)) if (!box.disabled) box.checked = want;
       saveSelection();
       syncClean();
+    },
+    tickGrp: (el) => {
+      const c = S.cats.find((x) => x.id === el.dataset.cat);
+      const imp = visibleInCat(c).filter((t) => t.source);
+      const want = groupState(imp) !== 'all';
+      for (const t of imp) if (usable(t)) t.checked = want;
+      for (const box of $$(`.item.grp[data-grp="${c.id}"] .ck`)) if (!box.disabled) box.checked = want;
+      saveSelection();
+      syncClean();
+    },
+    toggleGrp: (el) => {
+      const c = el.dataset.cat;
+      if (S.openGrp.has(c)) S.openGrp.delete(c); else S.openGrp.add(c);
+      render(false);
     },
     toggleCat: (el, e) => {
       if (e.target.closest('.ck')) return;
@@ -1585,7 +1719,8 @@ PAGES.settings = (m) => {
   const i = S.info || {};
   m.innerHTML = `<div class="page">${head('Настройки')}
     <h2 class="sec">Внешний вид</h2>
-    <div class="panel"><div class="setting"><div><h3>Тема</h3><p>Тёмная, светлая или как в Windows.</p></div>${seg('theme', s.theme || 'dark', [['dark', 'Тёмная'], ['light', 'Светлая'], ['auto', 'Как в Windows']])}</div></div>
+    <div class="panel"><div class="setting"><div><h3>Тема</h3><p>Тёмная, светлая или как в Windows.</p></div>${seg('theme', s.theme || 'dark', [['dark', 'Тёмная'], ['light', 'Светлая'], ['auto', 'Как в Windows']])}</div>
+    <div class="setting"><div><h3>Режим</h3><p>«Простой» — основные разделы и только безопасные пункты. «Эксперт» — все разделы, необратимые пункты, папки каждого правила и поиск.</p></div>${seg('xmode', s.expert ? 'expert' : 'simple', [['simple', 'Простой'], ['expert', 'Эксперт']])}</div></div>
 
     <h2 class="sec">Очистка</h2>
     <div class="panel"><div class="setting"><div><h3>Не трогать свежие временные файлы</h3><p>Их может использовать идущая сейчас установка или программа.</p></div>
@@ -1614,9 +1749,11 @@ PAGES.settings = (m) => {
 
     <h2 class="sec">О программе</h2>
     <div class="panel pad row-flex" style="gap:16px"><img src="icon.png" width="44" height="44" alt="">
-      <div><b>Prostor ${esc(i.version || '')}</b><p class="small muted">Очистка и анализ диска для Windows 10 и 11.</p></div></div></div>`;
+      <div><b>Prostor ${esc(i.version || '')}</b><p class="small muted">Очистка и анализ диска для Windows 10 и 11.</p>
+      ${S.rules ? `<p class="small muted">Правила очистки: ${fmtNum(S.rules.builtin)} собственных и ${fmtNum(S.rules.imported)} из базы <a href="https://github.com/MoscaDotTo/Winapp2" target="_blank" rel="noopener">Winapp2</a>${S.rules.w2Version ? ' (версия ' + esc(S.rules.w2Version) + ')' : ''}, лицензия CC BY-SA 4.0. Из базы взяты только кэш, журналы, временные файлы и дампы.</p>` : ''}</div></div></div>`;
   acts({
     theme: async (el) => { applyTheme(el.dataset.v); await saveSettings({ theme: el.dataset.v, themeChosen: true }); render(false); },
+    xmode: (el) => setMode(el.dataset.v === 'expert'),
     dor: (el) => saveSettings({ deleteOnReboot: el.checked }),
     qdays: async (el) => { if (await saveSettings({ quarantineDays: +el.dataset.v })) { S.q = null; render(false); } },
     elev: (el) => saveSettings({ autoElevate: el.checked }),

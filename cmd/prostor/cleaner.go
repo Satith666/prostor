@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -543,13 +544,63 @@ type CleanItem struct {
 }
 
 type CleanResult struct {
-	Items     []CleanItem `json:"items"`
-	Freed     int64       `json:"freed"`
-	Files     int64       `json:"files"`
-	Failed    int64       `json:"failed"`
-	Scheduled int64       `json:"scheduled"`
-	Seconds   float64     `json:"seconds"`
-	Journal   string      `json:"journal"`
+	Items     []CleanItem         `json:"items"`
+	Freed     int64               `json:"freed"`
+	Files     int64               `json:"files"`
+	Failed    int64               `json:"failed"`
+	Scheduled int64               `json:"scheduled"`
+	Seconds   float64             `json:"seconds"`
+	Journal   string              `json:"journal"`
+	Locked    int                 `json:"locked"`  // files other programs keep open
+	Holders   []winapi.LockHolder `json:"holders"` // those programs
+}
+
+// Files that could not be deleted because a program keeps them open, from
+// the last cleaning: shown with the programs that hold them, and offered for
+// deletion at the next restart.
+var lockedFiles struct {
+	sync.Mutex
+	paths []string
+}
+
+const maxLocked = 500
+
+func noteLocked(p string) {
+	lockedFiles.Lock()
+	if len(lockedFiles.paths) < maxLocked {
+		lockedFiles.paths = append(lockedFiles.paths, p)
+	}
+	lockedFiles.Unlock()
+}
+
+func lastLocked() []string {
+	lockedFiles.Lock()
+	defer lockedFiles.Unlock()
+	return append([]string(nil), lockedFiles.paths...)
+}
+
+// lockHolders asks Windows which programs hold the files (a sample is enough
+// to name them).
+func lockHolders(paths []string) []winapi.LockHolder {
+	if len(paths) > 120 {
+		paths = paths[:120]
+	}
+	hs, err := winapi.WhoLocks(paths)
+	if err != nil {
+		log.Printf("who locks: %v", err)
+		return nil
+	}
+	exe := map[uint32]string{}
+	for _, p := range winapi.Processes() {
+		exe[p.PID] = p.Name
+	}
+	for i := range hs {
+		hs[i].Exe = exe[hs[i].PID]
+		if hs[i].App == "" {
+			hs[i].App = hs[i].Exe
+		}
+	}
+	return hs
 }
 
 func removeFile(p string) error {
@@ -649,8 +700,11 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 	dc := newDirCache()
 	o := newWalkOpts(t, s, j.Cancelled, dc)
 	o.touched = map[string]bool{}
-	onFail := func(p string, size int64) {
+	onFail := func(p string, size int64, err error) {
 		ci.Failed++
+		if winapi.InUse(err) {
+			noteLocked(p)
+		}
 		if s.DeleteOnReboot && admin && winapi.IsWindows && !sandboxMode {
 			if winapi.DeleteOnReboot(p) == nil {
 				ci.Scheduled++
@@ -667,12 +721,12 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 		j.SetCurrent(r.path)
 		if r.isFile {
 			if o.at(r).matches(r.info.Name(), r.info) && !o.kept(r.path, r.info.Name()) {
-				if removeFile(r.path) == nil {
+				if err := removeFile(r.path); err == nil {
 					ci.Freed += r.info.Size()
 					ci.Files++
 					jr.add("d", r.path, r.info.Size(), t.ID)
 				} else {
-					onFail(r.path, r.info.Size())
+					onFail(r.path, r.info.Size(), err)
 				}
 			}
 			continue
@@ -687,7 +741,7 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 		}
 		ro := o.at(r)
 		ro.walk(r.path, func(p string, fi fs.FileInfo) {
-			if removeFile(p) == nil {
+			if err := removeFile(p); err == nil {
 				o.touched[lower(filepath.Dir(p))] = true
 				ci.Freed += fi.Size()
 				ci.Files++
@@ -695,7 +749,7 @@ func cleanTarget(j *Job, t *Target, s Settings, admin bool, jr *journal) CleanIt
 				j.Files.Add(1)
 				jr.add("d", p, fi.Size(), t.ID)
 			} else {
-				onFail(p, fi.Size())
+				onFail(p, fi.Size(), err)
 			}
 		}, linkFn)
 		if !r.loc.KeepDirs && !r.loc.Flat {
@@ -719,6 +773,9 @@ func cleanTargets(j *Job, ids []string, s Settings, admin bool, mode string) Cle
 		}
 	}
 	j.Total.Store(int64(len(list)))
+	lockedFiles.Lock()
+	lockedFiles.paths = nil
+	lockedFiles.Unlock()
 	jr := openJournal("clean")
 	for _, t := range list {
 		if j.Cancelled() {
@@ -732,6 +789,10 @@ func cleanTargets(j *Job, ids []string, s Settings, admin bool, mode string) Cle
 		res.Failed += ci.Failed
 		res.Scheduled += ci.Scheduled
 		j.Done.Add(1)
+	}
+	if locked := lastLocked(); len(locked) > 0 {
+		res.Locked = len(locked)
+		res.Holders = lockHolders(locked)
 	}
 	res.Seconds = time.Since(start).Seconds()
 	res.Journal = jr.close()

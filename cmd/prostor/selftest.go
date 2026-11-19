@@ -207,6 +207,7 @@ func (t *selfTest) runAll() {
 		})
 	}()
 	t.cleanerChecks()
+	t.lockChecks()
 	t.baitChecks()
 	t.analyzerChecks()
 	t.dupesChecks()
@@ -402,6 +403,39 @@ func makeLink(link, target string) error {
 }
 
 // ---------------------------------------------------------------- очистка
+
+// lockChecks: a file another program keeps open is reported with that program.
+func (t *selfTest) lockChecks() {
+	t.check("Безопасность очистки", "Программа, которая держит файл, определяется", func() (string, string) {
+		if !winapi.IsWindows {
+			return skipf("только в Windows")
+		}
+		p := filepath.Join(t.dir, "held.tmp")
+		if err := os.WriteFile(p, make([]byte, 4096), 0o644); err != nil {
+			return failf("не удалось создать файл: %v", err)
+		}
+		release, err := winapi.HoldFile(p)
+		if err != nil {
+			return failf("не удалось открыть файл: %v", err)
+		}
+		rmErr := removeFile(p)
+		hs := lockHolders([]string{p})
+		release()
+		if rmErr == nil {
+			return failf("занятый файл удалился — проверка не имеет смысла")
+		}
+		if !winapi.InUse(rmErr) {
+			return failf("ошибка удаления не распознана как «файл занят»: %v", rmErr)
+		}
+		for _, h := range hs {
+			if h.PID == uint32(os.Getpid()) {
+				os.Remove(p)
+				return okf("файл держит %s (PID %d) — так и есть", h.App, h.PID)
+			}
+		}
+		return failf("Restart Manager не назвал программу: %+v", hs)
+	})
+}
 
 func (t *selfTest) cleanerChecks() {
 	g := "Безопасность очистки"

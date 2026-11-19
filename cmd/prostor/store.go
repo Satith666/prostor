@@ -25,6 +25,7 @@ type Settings struct {
 	MinDupMB        int             `json:"minDupMB"`
 	AutoElevate     bool            `json:"autoElevate"`
 	QuarantineDays  int             `json:"quarantineDays"` // 0 = straight to the Recycle Bin
+	Expert          bool            `json:"expert"`         // expert mode: every rule, risky ones too
 }
 
 type HistoryItem struct {
