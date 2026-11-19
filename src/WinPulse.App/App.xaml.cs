@@ -138,6 +138,20 @@ public partial class App : Application
         encoder.Save(file);
     }
 
+    /// <summary>Все тексты на странице (для проверки перевода): TextBlock, включая скрытые прокруткой.</summary>
+    private static void DumpTexts(DependencyObject root, string path)
+    {
+        var lines = new List<string>();
+        void Walk(DependencyObject node)
+        {
+            if (node is System.Windows.Controls.TextBlock tb && tb.IsVisible && !string.IsNullOrWhiteSpace(tb.Text))
+                lines.Add(tb.Text.Replace('\n', ' '));
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) Walk(VisualTreeHelper.GetChild(node, i));
+        }
+        Walk(root);
+        File.WriteAllLines(path, lines.Distinct());
+    }
+
     private static IEnumerable<System.Windows.Controls.ScrollViewer> FindScrollers(DependencyObject parent)
     {
         int count = VisualTreeHelper.GetChildrenCount(parent);
@@ -177,6 +191,7 @@ public partial class App : Application
                 Layout();
                 string name = $"{++n:00}-{item.Key}";
                 Save(root, Path.Combine(dir, name + ".png"));
+                DumpTexts(root, Path.Combine(dir, name + ".txt"));
                 Mark(dir, "saved " + item.Key);
 
                 // Длинные страницы: прокручиваем и снимаем продолжение (до трёх экранов).

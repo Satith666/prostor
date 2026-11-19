@@ -100,6 +100,13 @@ jobs:
           New-Item -ItemType Directory -Force shots/en | Out-Null
           $p = Start-Process -FilePath "dist/WinPulse.exe" -ArgumentList '--demo', '--lang', 'en', '--screenshots', "$PWD/shots/en" -PassThru
           if (-not $p.WaitForExit(240000)) { "timeout" | Out-File shots/en/timeout.txt; $p.Kill() }
+          # Строки с кириллицей на английских страницах — то, что осталось без перевода.
+          $ru = Get-ChildItem shots/en -Filter *.txt | Where-Object Name -ne 'progress.txt' | ForEach-Object {
+            $page = $_.BaseName
+            Get-Content $_.FullName -Encoding utf8 | Where-Object { $_ -match '[А-Яа-яЁё]' } | ForEach-Object { "$page`t$_" }
+          }
+          $ru | Out-File shots/en/untranslated.txt -Encoding utf8
+          Write-Output "::notice title=Untranslated::$(@($ru).Count) lines"
 
       # Пробный замер FPS самой программы: проверяет запуск PresentMon и формат его вывода.
       - name: PresentMon smoke test
