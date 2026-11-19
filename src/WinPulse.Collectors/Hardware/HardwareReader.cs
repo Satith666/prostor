@@ -261,7 +261,8 @@ public static partial class HardwareReader
     public static List<string> SteamLibraries(string vdf) =>
         VdfPath().Matches(vdf).Select(m => m.Groups[1].Value.Replace(@"\\", @"\")).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-    private static List<GameInstall> FindGames()
+    /// <summary>Установленные игры Steam и Epic Games с типом диска.</summary>
+    public static List<GameInstall> FindGames()
     {
         var found = new List<(string Name, string Path)>();
         try

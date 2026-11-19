@@ -123,6 +123,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             "hw.title", "hw.subtitle", "hw.summary", usesGame: false, settings, LastGpuByPid));
         Add("nvidia", "nav.nvidia", "Icon.Gpu", new FixModuleViewModel("nvidia", new WinPulse.Optimizer.Nvidia.NvidiaModule(),
             "nv.title", "nv.subtitle", "nv.summary", usesGame: true, settings, LastGpuByPid));
+        Add("upscale", "nav.upscale", "Icon.Upscale", new UpscalersViewModel(IsDemo));
         Add("windowed", "nav.windowed", "Icon.Game", Windowed);
         Add("problems", "nav.problems", "Icon.Problems", Problems, "nav.system");
         Add("optimize", "nav.optimize", "Icon.Optimize", Optimization);
