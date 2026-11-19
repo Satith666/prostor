@@ -24,6 +24,7 @@ public class GamingTests
     {
         var csv = new PresentMonCsv();
         csv.Parse("Application,ProcessID,MsCPUBusy,MsCPUWait,MsGPUBusy", out _, out _);
+        Assert.True(csv.HasHeader);
         var frame = csv.Parse("game.exe,7,10.5,6.1,15.0", out _, out _);
         Assert.Equal(16.6, frame!.Value.FrameTimeMs, 3);
     }

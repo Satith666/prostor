@@ -26,11 +26,14 @@ public sealed class PresentMonCsv
         if (string.IsNullOrWhiteSpace(line)) return null;
 
         var cells = line.Split(',');
-        if (!HasHeader || cells.Contains("Application"))
+        // Заголовок узнаём по паре имён колонок: в строках данных «Application» тоже встречается (колонка FrameType).
+        bool header = Array.IndexOf(cells, "Application") >= 0 && Array.IndexOf(cells, "ProcessID") >= 0;
+        if (header)
         {
-            if (Array.IndexOf(cells, "Application") >= 0) ReadHeader(cells);
+            ReadHeader(cells);
             return null;
         }
+        if (!HasHeader) return null;
         if (cells.Length < _columns) return null; // строка ещё не дописана
 
         application = _app >= 0 ? cells[_app] : "";
