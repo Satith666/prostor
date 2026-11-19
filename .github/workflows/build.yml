@@ -22,10 +22,27 @@ jobs:
       - name: Publish WinPulse.exe
         run: dotnet publish src/WinPulse.App/WinPulse.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o dist -nologo "-flp:LogFile=build-errors.txt;ErrorsOnly"
 
+      # PresentMon (Intel, MIT) кладём рядом с WinPulse.exe — замер FPS работает без скачивания.
+      - name: Bundle PresentMon
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $headers = @{ 'User-Agent' = 'winpulse-ci'; 'Authorization' = "Bearer $env:GH_TOKEN" }
+          $releases = Invoke-RestMethod 'https://api.github.com/repos/GameTechDev/PresentMon/releases?per_page=20' -Headers $headers
+          $asset = $releases | Where-Object { -not $_.draft } | ForEach-Object { $_.assets } |
+            Where-Object { $_.name -match '^PresentMon-[\d.]+-x64\.exe$' } | Select-Object -First 1
+          if ($asset) {
+            Invoke-WebRequest $asset.browser_download_url -OutFile "dist/$($asset.name)"
+            Write-Output "::notice title=PresentMon::bundled $($asset.name)"
+          } else {
+            Write-Output "::warning title=PresentMon::no x64 console asset found"
+          }
+
       - uses: actions/upload-artifact@v4
         with:
           name: WinPulse-win-x64
-          path: dist/WinPulse.exe
+          path: dist/*.exe
 
       - name: Tests
         if: always()
@@ -73,6 +90,28 @@ jobs:
           $log = Join-Path $env:LOCALAPPDATA "WinPulse/logs/winpulse.log"
           if (Test-Path $log) { Copy-Item $log shots/winpulse.log -Force }
           Get-ChildItem shots | Format-Table Name, Length
+
+      # Пробный замер FPS самой программы: проверяет запуск PresentMon и формат его вывода.
+      - name: PresentMon smoke test
+        if: success()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $pm = Get-ChildItem dist -Filter 'PresentMon-*.exe' | Select-Object -First 1
+          if (-not $pm) { Write-Output "::warning title=PresentMon smoke::not bundled"; exit 0 }
+          $app = Start-Process dist/WinPulse.exe -ArgumentList '--demo' -PassThru
+          Start-Sleep 6
+          & $pm.FullName --process_name WinPulse.exe --output_file "$PWD/pm.csv" --timed 6 --terminate_after_timed --no_console_stats --stop_existing_session 2>&1 | Out-File pm-console.txt
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          if (Test-Path pm.csv) {
+            $lines = Get-Content pm.csv
+            Write-Output "::notice title=PresentMon CSV::$($lines.Count) lines"
+            Write-Output "::notice title=PresentMon header::$($lines[0])"
+            if ($lines.Count -gt 1) { Write-Output "::notice title=PresentMon row::$($lines[1])" }
+          } else {
+            $console = (Get-Content pm-console.txt -ErrorAction SilentlyContinue) -join ' | '
+            Write-Output "::warning title=PresentMon smoke::no csv. $console"
+          }
 
       - name: Publish screenshots to branch winpulse-shots
         if: success() && github.event_name == 'push'

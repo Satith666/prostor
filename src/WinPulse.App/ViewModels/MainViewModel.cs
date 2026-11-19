@@ -109,6 +109,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             if (problems is not null) problems.Alert = count > 0 ? count.ToString() : null;
         };
         Games = new GamesViewModel();
+        if (IsDemo && !Games.HasSessions) Games.AddSession(WinPulse.Core.Demo.DemoSession.Create());
         Add("lab", "nav.lab", "Icon.Lab", Games, "nav.games");
         Add("windowed", "nav.windowed", "Icon.Game", Windowed);
         Add("problems", "nav.problems", "Icon.Problems", Problems, "nav.system");
