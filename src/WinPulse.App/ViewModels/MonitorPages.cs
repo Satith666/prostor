@@ -49,6 +49,21 @@ public sealed class KpiVm : ObservableObject
     public string Value { get => _value; set => Set(ref _value, value); }
     public string Sub { get => _sub; set => Set(ref _sub, value); }
     public double[] Spark { get => _spark; set => Set(ref _spark, value); }
+
+    private double _percent;
+    private string _main = "";
+    /// <summary>Значение для кругового датчика, 0–100.</summary>
+    public double Percent
+    {
+        get => _percent;
+        set
+        {
+            if (Set(ref _percent, value)) OnPropertyChanged(nameof(PercentText));
+        }
+    }
+    public string PercentText => double.IsNaN(_percent) ? "—" : Math.Round(_percent).ToString("0");
+    /// <summary>Крупная строка рядом с датчиком: частота, «9,8 из 16 ГБ», имя видеокарты.</summary>
+    public string Main { get => _main; set => Set(ref _main, value); }
 }
 
 public sealed class VerdictVm : ObservableObject
@@ -97,9 +112,25 @@ public sealed class OverviewViewModel : PageViewModel
         Table = new AppTableViewModel("cpu");
         MetricCommand = new RelayCommand(p => Metric = p as string ?? "cpu");
         Kpis = new[] { Cpu, Memory, Disk, Gpu, Network };
+        Rings = new[] { Cpu, Gpu, Memory, Disk };
     }
 
     public IReadOnlyList<KpiVm> Kpis { get; }
+    /// <summary>Четыре круговых датчика «Пульта».</summary>
+    public IReadOnlyList<KpiVm> Rings { get; }
+
+    private double[] _cpuChart = [];
+    private double[] _gpuChart = [];
+    private string _statusText = "";
+    private string _statusLevel = "ok";
+    private string _netText = "";
+    public double[] CpuChart { get => _cpuChart; private set => Set(ref _cpuChart, value); }
+    public double[] GpuChart { get => _gpuChart; private set => Set(ref _gpuChart, value); }
+    /// <summary>«Всё спокойно» или «2 проблемы сейчас».</summary>
+    public string StatusText { get => _statusText; private set => Set(ref _statusText, value); }
+    /// <summary>ok | warn | bad — цвет плашки статуса.</summary>
+    public string StatusLevel { get => _statusLevel; private set => Set(ref _statusLevel, value); }
+    public string NetText { get => _netText; private set => Set(ref _netText, value); }
 
     public override string Key => "overview";
     public KpiVm Cpu { get; }
@@ -138,12 +169,16 @@ public sealed class OverviewViewModel : PageViewModel
         SystemLine = $"{f.Info.OsName} · {f.Info.CpuName} · {Ru.Bytes(f.Info.InstalledMemory)} · работает {Ru.Duration(raw.Cpu.Uptime)}";
 
         Cpu.Value = Ru.Percent(raw.Cpu.UtilityPercent);
+        Cpu.Percent = raw.Cpu.UtilityPercent;
+        Cpu.Main = raw.Cpu.EffectiveMHz is double cpuMhz ? Ru.GHz(cpuMhz) : Ru.Percent(raw.Cpu.UtilityPercent);
         Cpu.Sub = raw.Cpu.EffectiveMHz is double mhz ? Ru.GHz(mhz) + " · " + Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов")
             : Ru.Count(raw.Cpu.ProcessCount, "процесс", "процесса", "процессов");
         Cpu.Spark = HistorySnapshot.Tail(h.Cpu, 60);
 
         Memory.Value = Ru.Percent(raw.Memory.UsedPercent);
         Memory.Sub = $"{Ru.Bytes(f.Memory.InUse)} из {Ru.Bytes(f.Memory.Total)}";
+        Memory.Percent = raw.Memory.UsedPercent;
+        Memory.Main = Memory.Sub;
         Memory.Spark = HistorySnapshot.Tail(h.MemPercent, 60);
 
         var busiest = raw.Disks.OrderByDescending(d => d.ActivePercent).FirstOrDefault();
@@ -151,12 +186,16 @@ public sealed class OverviewViewModel : PageViewModel
         {
             Disk.Value = Ru.Percent(busiest.ActivePercent);
             Disk.Sub = $"{VerdictRules.DiskName(busiest)} · {Ru.Rate(busiest.ReadBps + busiest.WriteBps)}";
+            Disk.Percent = busiest.ActivePercent;
+            Disk.Main = Ru.Rate(busiest.ReadBps + busiest.WriteBps);
             Disk.Spark = h.Disks.TryGetValue(busiest.Index, out var dh) ? HistorySnapshot.Tail(dh.Active, 60) : [];
         }
         else
         {
             Disk.Value = "—";
             Disk.Sub = "нет данных";
+            Disk.Percent = 0;
+            Disk.Main = "—";
         }
 
         var gpu = raw.Gpus.OrderByDescending(g => g.UtilPercent).FirstOrDefault();
@@ -164,18 +203,31 @@ public sealed class OverviewViewModel : PageViewModel
         {
             Gpu.Value = Ru.Percent(gpu.UtilPercent);
             Gpu.Sub = gpu.DedicatedTotal > 0 ? $"видеопамять {Ru.Bytes(gpu.DedicatedUsed)} из {Ru.Bytes(gpu.DedicatedTotal)}" : gpu.Name;
+            Gpu.Percent = gpu.UtilPercent;
+            Gpu.Main = ShortGpuName(gpu.Name);
             Gpu.Spark = HistorySnapshot.Tail(h.GpuUtil, 60);
         }
         else
         {
             Gpu.Value = "—";
             Gpu.Sub = "нет данных";
+            Gpu.Percent = 0;
+            Gpu.Main = "—";
         }
 
         double rx = raw.Network.Sum(n => n.ReceiveBps), tx = raw.Network.Sum(n => n.SendBps);
         Network.Value = Ru.Bits(rx + tx);
         Network.Sub = $"↓ {Ru.Bits(rx)} · ↑ {Ru.Bits(tx)}";
         Network.Spark = HistorySnapshot.Tail(h.NetRx, 60);
+        NetText = $"Сеть ↓ {Ru.Bits(rx)} · ↑ {Ru.Bits(tx)}";
+
+        CpuChart = HistorySnapshot.Tail(h.Cpu, 120);
+        GpuChart = HistorySnapshot.Tail(h.GpuUtil, 120);
+
+        int problems = f.Verdicts.Count(v => v.Severity >= Severity.Warning);
+        bool critical = f.Verdicts.Any(v => v.Severity == Severity.Critical);
+        StatusLevel = critical ? "bad" : problems > 0 ? "warn" : "ok";
+        StatusText = problems == 0 ? "Всё спокойно" : $"{Ru.Count(problems, "проблема", "проблемы", "проблем")} сейчас";
 
         var verdicts = f.Verdicts.Take(6).ToList();
         CollectionSync.Sync(Verdicts, verdicts, v => v.Area + "|" + v.Title, vm => vm.Key, v => new VerdictVm(v.Area + "|" + v.Title),
@@ -187,6 +239,15 @@ public sealed class OverviewViewModel : PageViewModel
             });
 
         Table.Update(f.Apps, raw.Memory.TotalPhysical);
+    }
+
+    /// <summary>«NVIDIA GeForce RTX 3050» → «RTX 3050»: на датчике мало места.</summary>
+    private static string ShortGpuName(string name)
+    {
+        string n = name;
+        foreach (var prefix in new[] { "NVIDIA ", "GeForce ", "AMD ", "Radeon(TM) ", "Intel(R) ", "Intel " })
+            if (n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) n = n[prefix.Length..];
+        return n.Trim();
     }
 }
 

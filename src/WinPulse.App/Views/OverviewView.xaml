@@ -5,6 +5,7 @@
              xmlns:v="clr-namespace:WinPulse.App.Views"
              xmlns:c="clr-namespace:WinPulse.App.Controls">
     <UserControl.Resources>
+        <!-- Карточка-кнопка с круговым датчиком: щелчок открывает подробную страницу -->
         <Style x:Key="Tile" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -14,95 +15,178 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bd" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1"
-                                CornerRadius="10" Padding="14,12">
+                                CornerRadius="18" Padding="16">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#343B47"/>
-                                <Setter TargetName="bd" Property="Background" Value="#181C24"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#6622D3EE"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="StatusChip" TargetType="Border">
+            <Setter Property="CornerRadius" Value="13"/>
+            <Setter Property="Padding" Value="11,4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{StaticResource GoodBg}"/>
+            <Setter Property="BorderBrush" Value="#5934D399"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding StatusLevel}" Value="warn">
+                    <Setter Property="Background" Value="{StaticResource WarnBg}"/>
+                    <Setter Property="BorderBrush" Value="#59FB923C"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding StatusLevel}" Value="bad">
+                    <Setter Property="Background" Value="{StaticResource BadBg}"/>
+                    <Setter Property="BorderBrush" Value="#59F87171"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StatusDot" TargetType="Ellipse">
+            <Setter Property="Fill" Value="{StaticResource Good}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding StatusLevel}" Value="warn">
+                    <Setter Property="Fill" Value="{StaticResource Warn}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding StatusLevel}" Value="bad">
+                    <Setter Property="Fill" Value="{StaticResource Bad}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="28,24,28,28">
-            <TextBlock Text="Обзор" Style="{StaticResource H1}"/>
-            <TextBlock Text="{Binding SystemLine}" Style="{StaticResource FaintText}" Margin="0,4,0,18" TextTrimming="CharacterEllipsis"/>
+        <StackPanel Margin="30,26,30,30">
 
-            <!-- Плитки -->
-            <ItemsControl ItemsSource="{Binding Kpis}" Margin="-6,0,-6,0">
+            <!-- Заголовок и статус -->
+            <TextBlock Text="Пульт" Style="{StaticResource H1}" FontSize="32"/>
+            <WrapPanel Margin="0,8,0,22">
+                <Border Style="{StaticResource StatusChip}" Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" Style="{StaticResource StatusDot}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="{Binding SystemLine}" Style="{StaticResource FaintText}" FontSize="13" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+            </WrapPanel>
+
+            <!-- Круговые датчики -->
+            <ItemsControl ItemsSource="{Binding Rings}" Margin="-8,0,-8,0" Focusable="False">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <UniformGrid Columns="5"/>
+                        <UniformGrid Columns="4"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:KpiVm}">
-                        <Button Style="{StaticResource Tile}" Command="{Binding OpenCommand}" Margin="6,0">
-                            <StackPanel>
-                                <TextBlock Text="{Binding Title}" Style="{StaticResource Caption}"/>
-                                <TextBlock Text="{Binding Value}" Style="{StaticResource Big}" Margin="0,4,0,0"/>
-                                <TextBlock Text="{Binding Sub}" Style="{StaticResource FaintText}" TextTrimming="CharacterEllipsis"/>
-                                <c:AreaChart Height="38" Margin="0,10,0,0" Values="{Binding Spark}" Capacity="60"
-                                             Maximum="{Binding SparkMax}" Stroke="{Binding Brush}" MinimumScale="1"/>
-                            </StackPanel>
+                        <Button Style="{StaticResource Tile}" Command="{Binding OpenCommand}" Margin="8,0"
+                                ToolTip="Открыть подробности">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Width="96" Height="96">
+                                    <c:RingGauge Value="{Binding Percent}" RingBrush="{Binding Brush}" Thickness="9"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding PercentText}" FontFamily="{StaticResource DisplayFont}" FontSize="26" FontWeight="Bold"/>
+                                        <TextBlock Text="%" FontSize="13" Foreground="{StaticResource Faint}" VerticalAlignment="Bottom" Margin="1,0,0,4"/>
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title, Converter={StaticResource Upper}}" Style="{StaticResource Caption}"/>
+                                    <TextBlock Text="{Binding Main}" FontFamily="{StaticResource DisplayFont}" FontSize="17" FontWeight="SemiBold"
+                                               Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Sub}" Style="{StaticResource FaintText}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Grid>
                         </Button>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!-- Главное сейчас -->
-            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
-                <StackPanel>
-                    <TextBlock Text="Главное сейчас" Style="{StaticResource H2}" Margin="0,0,0,10"/>
-                    <ItemsControl ItemsSource="{Binding Verdicts}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type vm:VerdictVm}">
-                                <Grid Margin="0,4,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Ellipse Width="9" Height="9" Margin="2,5,12,0" VerticalAlignment="Top">
-                                        <Ellipse.Style>
-                                            <Style TargetType="Ellipse">
-                                                <Setter Property="Fill" Value="{StaticResource Good}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Level}" Value="info">
-                                                        <Setter Property="Fill" Value="{StaticResource Accent}"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Level}" Value="warn">
-                                                        <Setter Property="Fill" Value="{StaticResource Warn}"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Level}" Value="bad">
-                                                        <Setter Property="Fill" Value="{StaticResource Bad}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Ellipse.Style>
-                                    </Ellipse>
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedText}" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Border>
+            <!-- График и «главное сейчас» -->
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*" MinWidth="300"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource Card}">
+                    <DockPanel>
+                        <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                            <TextBlock Text="Нагрузка за 2 минуты" Style="{StaticResource H2}" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Border Width="10" Height="10" CornerRadius="3" Background="{StaticResource Series.Cpu}" Margin="0,0,6,0"/>
+                                <TextBlock Text="Процессор" Style="{StaticResource FaintText}" Margin="0,0,14,0"/>
+                                <Border Width="10" Height="10" CornerRadius="3" Background="{StaticResource Series.Gpu}" Margin="0,0,6,0"/>
+                                <TextBlock Text="Видеокарта" Style="{StaticResource FaintText}"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock DockPanel.Dock="Bottom" Text="{Binding NetText}" Style="{StaticResource FaintText}" Margin="0,10,0,0"/>
+                        <c:AreaChart Height="200" Values="{Binding CpuChart}" Values2="{Binding GpuChart}" Capacity="120" Maximum="100"
+                                     Stroke="{StaticResource Series.Cpu}" Stroke2="{StaticResource Series.Gpu}"
+                                     ShowGrid="True" GridBrush="{StaticResource Line}" FillOpacity="0.17"/>
+                    </DockPanel>
+                </Border>
+
+                <!-- Свечение — отдельным пустым слоем, чтобы текст оставался чётким -->
+                <Border Grid.Column="2" Style="{StaticResource FeatureCard}" Effect="{StaticResource GlowViolet}"/>
+                <Border Grid.Column="2" Style="{StaticResource FeatureCard}" Background="Transparent" BorderBrush="Transparent">
+                    <StackPanel>
+                        <TextBlock Text="ГЛАВНОЕ СЕЙЧАС" Style="{StaticResource Caption}" Foreground="#C4B5FD" Margin="0,0,0,12"/>
+                        <ItemsControl ItemsSource="{Binding Verdicts}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:VerdictVm}">
+                                    <Grid Margin="0,2,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="9" Height="9" Margin="2,5,12,0" VerticalAlignment="Top">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Fill" Value="{StaticResource Good}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Level}" Value="info">
+                                                            <Setter Property="Fill" Value="{StaticResource Accent}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Level}" Value="warn">
+                                                            <Setter Property="Fill" Value="{StaticResource Warn}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Level}" Value="bad">
+                                                            <Setter Property="Fill" Value="{StaticResource Bad}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedText}" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <!-- Кто нагружает -->
             <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                 <StackPanel>
-                    <Grid Margin="0,0,0,10">
-                        <TextBlock Text="Кто нагружает" Style="{StaticResource H2}" VerticalAlignment="Center"/>
-                        <Border Background="{StaticResource PanelAlt}" CornerRadius="8" Padding="2" HorizontalAlignment="Right">
+                    <Grid Margin="0,0,0,12">
+                        <TextBlock Text="Что грузит систему" Style="{StaticResource H2}" VerticalAlignment="Center"/>
+                        <Border Background="{StaticResource PanelAlt}" CornerRadius="10" Padding="3" HorizontalAlignment="Right">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton Style="{StaticResource Segment}" GroupName="metric" Content="Процессор" IsChecked="{Binding MetricCpu, Mode=TwoWay}"/>
                                 <RadioButton Style="{StaticResource Segment}" GroupName="metric" Content="Память" IsChecked="{Binding MetricMemory, Mode=TwoWay}"/>

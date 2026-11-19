@@ -47,22 +47,28 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240"/>
+            <ColumnDefinition Width="248"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
+        <!-- Подсветка фона: циан слева сверху, фиолетовый справа снизу -->
+        <Rectangle Grid.ColumnSpan="2" Fill="{StaticResource BgGlowCyan}" IsHitTestVisible="False"/>
+        <Rectangle Grid.ColumnSpan="2" Fill="{StaticResource BgGlowViolet}" IsHitTestVisible="False"/>
+
         <!-- Боковое меню -->
         <Border Background="{StaticResource Sidebar}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
-            <DockPanel Margin="12,16,12,12">
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,0,0,10">
-                    <Viewbox Width="24" Height="24">
-                        <Canvas Width="24" Height="24">
-                            <Path Data="M2,12 H6 L9,5 L13,19 L16,12 H22" Stroke="{StaticResource Accent}" StrokeThickness="2.2"
-                                  StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
-                        </Canvas>
-                    </Viewbox>
-                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="WinPulse" FontSize="16" FontWeight="SemiBold"/>
+            <DockPanel Margin="14,20,14,14">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,16">
+                    <Border Width="36" Height="36" CornerRadius="11" Background="{StaticResource AccentGradient}" Effect="{StaticResource GlowCyan}">
+                        <Viewbox Width="21" Height="21">
+                            <Canvas Width="24" Height="24">
+                                <Path Data="M2,12 H6 L8,7 L12,17 L14,12 H22" Stroke="#04111A" StrokeThickness="2.6"
+                                      StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="WinPulse" FontFamily="{StaticResource DisplayFont}" FontSize="20" FontWeight="Bold"/>
                         <TextBlock Text="{Binding [app.tagline], Source={x:Static i:Loc.I}}" Style="{StaticResource FaintText}" FontSize="11"/>
                     </StackPanel>
                 </StackPanel>
@@ -74,10 +80,12 @@
                             ToolTip="{Binding [shell.demo.hint], Source={x:Static i:Loc.I}}">
                         <TextBlock Text="{Binding [shell.demo], Source={x:Static i:Loc.I}}" Foreground="{StaticResource Warn}" FontSize="11" FontWeight="SemiBold"/>
                     </Border>
-                    <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding ProMode, Mode=TwoWay}" Margin="0,0,0,10"
-                                  ToolTip="{Binding [shell.pro.hint], Source={x:Static i:Loc.I}}">
-                        <TextBlock Text="{Binding [shell.pro], Source={x:Static i:Loc.I}}"/>
-                    </ToggleButton>
+                    <Border CornerRadius="12" Padding="12,10" Margin="0,0,0,12" Background="#1A8B5CF6" BorderBrush="#408B5CF6" BorderThickness="1">
+                        <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding ProMode, Mode=TwoWay}"
+                                      ToolTip="{Binding [shell.pro.hint], Source={x:Static i:Loc.I}}">
+                            <TextBlock Text="{Binding [shell.pro], Source={x:Static i:Loc.I}}" Foreground="{StaticResource Text}"/>
+                        </ToggleButton>
+                    </Border>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <TextBlock Text="{Binding [shell.language], Source={x:Static i:Loc.I}}" Style="{StaticResource FaintText}"
                                    VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -110,7 +118,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:NavItem}">
                                 <StackPanel>
-                                    <TextBlock Text="{Binding Section}" Style="{StaticResource Caption}" Margin="10,14,10,4"
+                                    <TextBlock Text="{Binding Section, Converter={StaticResource Upper}}" Style="{StaticResource Caption}" Margin="12,16,10,6"
                                                Visibility="{Binding Section, Converter={StaticResource NullToVis}}"/>
                                     <RadioButton Style="{StaticResource Nav}" GroupName="nav" Tag="{Binding Icon}"
                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}">
@@ -123,6 +131,11 @@
                                             <TextBlock Grid.Column="1" Text="{Binding Badge}" Foreground="{StaticResource Faint}" FontSize="11"
                                                        Margin="8,0,0,0" VerticalAlignment="Center"
                                                        Visibility="{Binding Soon, Converter={StaticResource BoolToVisInv}}"/>
+                                            <Border Grid.Column="1" CornerRadius="9" Padding="7,1" Margin="8,0,0,0" Background="{StaticResource Warn}"
+                                                    VerticalAlignment="Center" Effect="{StaticResource GlowWarn}"
+                                                    Visibility="{Binding Alert, Converter={StaticResource NullToVis}}">
+                                                <TextBlock Text="{Binding Alert}" Foreground="#1A0B00" FontSize="11" FontWeight="Bold"/>
+                                            </Border>
                                             <Border Grid.Column="1" Style="{StaticResource Chip}" Padding="6,0" Margin="8,0,0,0"
                                                     Visibility="{Binding Soon, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="{Binding [nav.soon], Source={x:Static i:Loc.I}}" FontSize="9"

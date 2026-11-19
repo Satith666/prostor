@@ -104,9 +104,19 @@ public sealed class AreaChart : FrameworkElement
                 ctx.LineTo(new Point(x0 + (n - 1) * step, h), true, false);
             }
             area.Freeze();
-            Brush fillBrush = stroke is SolidColorBrush sb
-                ? new SolidColorBrush(sb.Color) { Opacity = FillOpacity }
-                : new SolidColorBrush(Color.FromArgb(40, 128, 128, 128));
+            // Заливка градиентом: у линии плотнее, к низу графика растворяется.
+            Brush fillBrush;
+            if (stroke is SolidColorBrush sb)
+            {
+                byte topAlpha = (byte)(255 * Math.Clamp(FillOpacity * 2.6, 0, 1));
+                fillBrush = new LinearGradientBrush(
+                    Color.FromArgb(topAlpha, sb.Color.R, sb.Color.G, sb.Color.B),
+                    Color.FromArgb(0, sb.Color.R, sb.Color.G, sb.Color.B), 90);
+            }
+            else
+            {
+                fillBrush = new SolidColorBrush(Color.FromArgb(40, 128, 128, 128));
+            }
             fillBrush.Freeze();
             dc.DrawGeometry(fillBrush, null, area);
         }
@@ -118,9 +128,107 @@ public sealed class AreaChart : FrameworkElement
             for (int i = 1; i < n; i++) ctx.LineTo(new Point(x0 + i * step, Y(values[i])), true, true);
         }
         line.Freeze();
-        var pen = new Pen(stroke, 1.5) { LineJoin = PenLineJoin.Round };
+        var pen = new Pen(stroke, 2) { LineJoin = PenLineJoin.Round };
         pen.Freeze();
         dc.DrawGeometry(null, pen, line);
+    }
+}
+
+/// <summary>
+/// Круговой датчик: дуга от 12 часов по часовой стрелке, с подсветкой цвета дуги и плавным переходом между значениями.
+/// </summary>
+public sealed class RingGauge : FrameworkElement
+{
+    public static readonly DependencyProperty ValueProperty = DependencyProperty.Register(
+        nameof(Value), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, OnValueChanged));
+
+    public static readonly DependencyProperty MaximumProperty = DependencyProperty.Register(
+        nameof(Maximum), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(100.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty RingBrushProperty = DependencyProperty.Register(
+        nameof(RingBrush), typeof(Brush), typeof(RingGauge),
+        new FrameworkPropertyMetadata(Brushes.DeepSkyBlue, FrameworkPropertyMetadataOptions.AffectsRender, OnRingBrushChanged));
+
+    public static readonly DependencyProperty TrackBrushProperty = DependencyProperty.Register(
+        nameof(TrackBrush), typeof(Brush), typeof(RingGauge),
+        new FrameworkPropertyMetadata(new SolidColorBrush(Color.FromArgb(18, 255, 255, 255)), FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty ThicknessProperty = DependencyProperty.Register(
+        nameof(Thickness), typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(10.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    private static readonly DependencyProperty ShownProperty = DependencyProperty.Register(
+        "Shown", typeof(double), typeof(RingGauge), new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    private readonly System.Windows.Media.Effects.DropShadowEffect _glow = new()
+    {
+        ShadowDepth = 0,
+        BlurRadius = 12,
+        Opacity = 0.75,
+        Color = Colors.DeepSkyBlue,
+    };
+
+    public RingGauge()
+    {
+        Effect = _glow;
+    }
+
+    public double Value { get => (double)GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
+    public double Maximum { get => (double)GetValue(MaximumProperty); set => SetValue(MaximumProperty, value); }
+    public Brush RingBrush { get => (Brush)GetValue(RingBrushProperty); set => SetValue(RingBrushProperty, value); }
+    public Brush TrackBrush { get => (Brush)GetValue(TrackBrushProperty); set => SetValue(TrackBrushProperty, value); }
+    public double Thickness { get => (double)GetValue(ThicknessProperty); set => SetValue(ThicknessProperty, value); }
+
+    private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var gauge = (RingGauge)d;
+        double target = e.NewValue is double v && !double.IsNaN(v) ? v : 0;
+        var animation = new System.Windows.Media.Animation.DoubleAnimation(target, TimeSpan.FromMilliseconds(450))
+        {
+            EasingFunction = new System.Windows.Media.Animation.QuadraticEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut },
+        };
+        gauge.BeginAnimation(ShownProperty, animation);
+    }
+
+    private static void OnRingBrushChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is SolidColorBrush b) ((RingGauge)d)._glow.Color = b.Color;
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        double w = ActualWidth, h = ActualHeight;
+        double t = Math.Max(1, Thickness);
+        double r = (Math.Min(w, h) - t) / 2 - 2;
+        if (r < 4) return;
+        var center = new Point(w / 2, h / 2);
+
+        var track = new Pen(TrackBrush, t);
+        track.Freeze();
+        dc.DrawEllipse(null, track, center, r, r);
+
+        double max = Maximum > 0 ? Maximum : 100;
+        double fraction = Math.Clamp((double)GetValue(ShownProperty) / max, 0, 1);
+        if (fraction <= 0.001) return;
+
+        var pen = new Pen(RingBrush, t) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        pen.Freeze();
+        if (fraction >= 0.999)
+        {
+            dc.DrawEllipse(null, pen, center, r, r);
+            return;
+        }
+
+        double angle = -Math.PI / 2 + fraction * 2 * Math.PI;
+        var start = new Point(center.X, center.Y - r);
+        var end = new Point(center.X + r * Math.Cos(angle), center.Y + r * Math.Sin(angle));
+        var arc = new StreamGeometry();
+        using (var ctx = arc.Open())
+        {
+            ctx.BeginFigure(start, false, false);
+            ctx.ArcTo(end, new Size(r, r), 0, fraction > 0.5, SweepDirection.Clockwise, true, false);
+        }
+        arc.Freeze();
+        dc.DrawGeometry(null, pen, arc);
     }
 }
 

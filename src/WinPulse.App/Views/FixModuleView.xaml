@@ -236,7 +236,7 @@
                             <DataTrigger Binding="{Binding StatusKey}" Value="improve">
                                 <Setter TargetName="chip" Property="Background" Value="{StaticResource WarnBg}"/>
                                 <Setter TargetName="chipText" Property="Foreground" Value="{StaticResource Warn}"/>
-                                <Setter TargetName="card" Property="BorderBrush" Value="#4A3A22"/>
+                                <Setter TargetName="card" Property="BorderBrush" Value="#80FB923C"/>
                                 <Setter TargetName="numText" Property="Foreground" Value="{StaticResource Warn}"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding StatusKey}" Value="na">

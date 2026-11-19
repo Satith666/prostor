@@ -14,12 +14,12 @@ public sealed class Loc : INotifyPropertyChanged
     private static readonly Dictionary<string, (string Ru, string En)> Map = new()
     {
         // Оболочка
-        ["app.tagline"] = ("монитор и оптимизация", "monitor & optimizer"),
+        ["app.tagline"] = ("пульт игрового ПК", "gaming PC cockpit"),
         ["nav.monitoring"] = ("МОНИТОРИНГ", "MONITORING"),
         ["nav.diagnostics"] = ("ДИАГНОСТИКА", "DIAGNOSTICS"),
         ["nav.optimization"] = ("ОПТИМИЗАЦИЯ", "OPTIMIZATION"),
         ["nav.soon"] = ("СКОРО", "COMING SOON"),
-        ["nav.overview"] = ("Обзор", "Overview"),
+        ["nav.overview"] = ("Пульт", "Dashboard"),
         ["nav.cpu"] = ("Процессор", "Processor"),
         ["nav.memory"] = ("Память", "Memory"),
         ["nav.disk"] = ("Диски", "Disks"),

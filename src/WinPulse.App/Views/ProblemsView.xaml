@@ -81,7 +81,7 @@
             </Border>
 
             <!-- Всё хорошо -->
-            <Border Style="{StaticResource Card}" Margin="0,16,0,0" Background="{StaticResource GoodBg}" BorderBrush="#1F4A30"
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0" Background="{StaticResource GoodBg}" BorderBrush="#5534D399"
                     Visibility="{Binding NoProblems, Converter={StaticResource BoolToVis}}">
                 <TextBlock Text="За 30 дней серьёзных проблем не найдено. Ниже можно посмотреть, что именно проверено."
                            Foreground="{StaticResource Good}" TextWrapping="Wrap"/>
@@ -177,10 +177,10 @@
                         </Border>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding Level}" Value="bad">
-                                <Setter TargetName="card" Property="BorderBrush" Value="#5A2A2A"/>
+                                <Setter TargetName="card" Property="BorderBrush" Value="#80F87171"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Level}" Value="warn">
-                                <Setter TargetName="card" Property="BorderBrush" Value="#4A3A22"/>
+                                <Setter TargetName="card" Property="BorderBrush" Value="#80FB923C"/>
                             </DataTrigger>
                         </DataTemplate.Triggers>
                     </DataTemplate>

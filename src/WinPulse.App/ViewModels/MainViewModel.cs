@@ -49,6 +49,10 @@ public sealed class NavItem : ObservableObject
 
     public string Badge { get => _badge; set => Set(ref _badge, value); }
 
+    private string? _alert;
+    /// <summary>Оранжевая «пилюля» с числом (например, найденные проблемы). null — не показывать.</summary>
+    public string? Alert { get => _alert; set => Set(ref _alert, value); }
+
     public void RefreshTexts()
     {
         OnPropertyChanged(nameof(Title));
@@ -93,7 +97,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         Add("gpu", "nav.gpu", "Icon.Gpu", new GpuViewModel());
         Add("network", "nav.network", "Icon.Network", new NetworkViewModel());
         Problems = new ProblemsViewModel();
-        Problems.Scanned += (critical, warnings) => SetBadge("problems", critical + warnings > 0 ? (critical + warnings).ToString() : "✓");
+        Problems.Scanned += (critical, warnings) =>
+        {
+            int count = critical + warnings;
+            SetBadge("problems", count > 0 ? "" : "✓");
+            var problems = Nav.FirstOrDefault(n => n.Key == "problems");
+            if (problems is not null) problems.Alert = count > 0 ? count.ToString() : null;
+        };
         Add("problems", "nav.problems", "Icon.Problems", Problems, "nav.diagnostics");
         Add("windowed", "nav.windowed", "Icon.Game", Windowed, "nav.optimization");
         Add("optimize", "nav.optimize", "Icon.Optimize", Optimization);

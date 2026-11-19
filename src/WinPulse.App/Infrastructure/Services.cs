@@ -214,6 +214,15 @@ public sealed class NotNullConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
 }
 
+/// <summary>Строка в верхнем регистре (подписи разделов меню).</summary>
+public sealed class UpperConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is string s ? s.ToUpper(culture) : value;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
 /// <summary>Visible, если все значения true.</summary>
 public sealed class AllTrueToVisibility : IMultiValueConverter
 {
