@@ -660,7 +660,19 @@ func routes() http.Handler {
 		}
 		ok(w)
 	})
-	get("/api/startup", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, listStartup()) })
+	get("/api/startup", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, startupReport()) })
+	post("/api/startup/delay", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			ID      string
+			Delayed bool
+		}
+		readJSON(r, &req)
+		if err := setDelay(req.ID, req.Delayed); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
 	post("/api/startup/toggle", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			ID      string
@@ -669,6 +681,91 @@ func routes() http.Handler {
 		readJSON(r, &req)
 		if err := setStartup(req.ID, req.Enabled); err != nil {
 			writeErr(w, errors.New("не удалось изменить: "+err.Error()))
+			return
+		}
+		ok(w)
+	})
+
+	// ------------------------------------------------------------ system: disks and Windows' own space
+	get("/api/system", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, systemState()) })
+	post("/api/system/drivers", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := startJob("drivers", func(j *Job) (any, error) {
+			res, err := listDrivers(j)
+			if rep, ok := res.(*DriverReport); ok {
+				lastDrivers.Lock()
+				lastDrivers.rep = rep
+				lastDrivers.Unlock()
+			}
+			return res, err
+		}); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
+	post("/api/system/drivers/remove", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Infs []string }
+		readJSON(r, &req)
+		lastDrivers.Lock()
+		rep := lastDrivers.rep
+		lastDrivers.Unlock()
+		if _, err := startJob("driversrm", func(j *Job) (any, error) { return removeDrivers(j, req.Infs, rep) }); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
+	post("/api/system/vdisk", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Path string }
+		readJSON(r, &req)
+		if _, err := startJob("tool", func(j *Job) (any, error) { return compactVDisk(j, req.Path) }); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
+	post("/api/system/shadows", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Drive string
+			Limit int // percent; 0 = delete old restore points
+		}
+		readJSON(r, &req)
+		if req.Limit > 0 {
+			if err := limitShadows(req.Drive, req.Limit); err != nil {
+				writeErr(w, err)
+				return
+			}
+			ok(w)
+			return
+		}
+		if _, err := startJob("tool", func(j *Job) (any, error) { return trimShadows(j, req.Drive) }); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
+	post("/api/system/reserved", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ Enabled bool }
+		readJSON(r, &req)
+		if err := setReservedStorage(req.Enabled); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
+	// program updates through winget
+	post("/api/upgrades", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := startJob("upgrades", listUpgrades); err != nil {
+			writeErr(w, err)
+			return
+		}
+		ok(w)
+	})
+	post("/api/upgrades/run", func(w http.ResponseWriter, r *http.Request) {
+		var req struct{ IDs []string }
+		readJSON(r, &req)
+		if _, err := startJob("upgrade", func(j *Job) (any, error) { return runUpgrades(j, req.IDs) }); err != nil {
+			writeErr(w, err)
 			return
 		}
 		ok(w)

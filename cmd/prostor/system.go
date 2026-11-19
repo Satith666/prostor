@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -159,8 +158,15 @@ type StartupItem struct {
 	Enabled  bool   `json:"enabled"`
 	Exists   bool   `json:"exists"`
 	NeedsAdm bool   `json:"needsAdmin"`
+	Kind     string `json:"kind"` // run | folder | task | service | appx
+	Delayed  bool   `json:"delayed"`
+	CanDelay bool   `json:"canDelay"`
+	Slow     int64  `json:"slow"` // ms Windows says it delayed the boot
 
 	approvedRoot winapi.Root
+	taskPath     string
+	svcName      string
+	appxKey      string
 	approvedKey  string
 	approvedName string
 }
@@ -197,7 +203,7 @@ func listStartup() []StartupItem {
 			exe, _ := splitCommand(cmd)
 			_, err := os.Stat(exe)
 			out = append(out, StartupItem{
-				ID: rk.source + "|" + v.Name, Name: v.Name, Command: cmd, Path: exe, Source: rk.source, Scope: rk.scope,
+				ID: rk.source + "|" + v.Name, Kind: "run", Name: v.Name, Command: cmd, Path: exe, Source: rk.source, Scope: rk.scope,
 				Enabled: approvalState(rk.root, rk.approved, v.Name), Exists: err == nil, NeedsAdm: rk.scope == "machine",
 				approvedRoot: rk.root, approvedKey: rk.approved, approvedName: v.Name,
 			})
@@ -220,7 +226,7 @@ func listStartup() []StartupItem {
 			}
 			p := filepath.Join(f.dir, e.Name())
 			out = append(out, StartupItem{
-				ID: f.source + "|" + e.Name(), Name: strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())), Command: p, Path: p,
+				ID: f.source + "|" + e.Name(), Kind: "folder", Name: strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())), Command: p, Path: p,
 				Source: f.source, Scope: f.scope, Enabled: approvalState(f.root, "StartupFolder", e.Name()), Exists: true,
 				NeedsAdm: f.scope == "machine", approvedRoot: f.root, approvedKey: "StartupFolder", approvedName: e.Name(),
 			})
@@ -230,20 +236,15 @@ func listStartup() []StartupItem {
 	return out
 }
 
-func setStartup(id string, enabled bool) error {
-	for _, it := range listStartup() {
-		if it.ID != id {
-			continue
-		}
-		data := make([]byte, 12)
-		if enabled {
-			data[0] = 0x02
-		} else {
-			data[0] = 0x03
-			ft := time.Now().UnixNano()/100 + 116444736000000000 // FILETIME
-			binary.LittleEndian.PutUint64(data[4:], uint64(ft))
-		}
-		return winapi.RegSetBinary(it.approvedRoot, approvedBase+it.approvedKey, it.approvedName, data)
+// setApproval switches a Run or Startup folder item the way Task Manager does.
+func setApproval(it *StartupItem, enabled bool) error {
+	data := make([]byte, 12)
+	if enabled {
+		data[0] = 0x02
+	} else {
+		data[0] = 0x03
+		ft := time.Now().UnixNano()/100 + 116444736000000000 // FILETIME
+		binary.LittleEndian.PutUint64(data[4:], uint64(ft))
 	}
-	return errors.New("элемент автозагрузки не найден")
+	return winapi.RegSetBinary(it.approvedRoot, approvedBase+it.approvedKey, it.approvedName, data)
 }

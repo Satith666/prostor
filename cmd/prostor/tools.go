@@ -41,6 +41,19 @@ var tools = []Tool{
 		Desc:    "Очищает все журналы «Просмотра событий». Полезно, но удалит историю диагностики сбоев.",
 		Confirm: "Очистить все журналы событий Windows? История диагностики будет удалена."},
 
+	{ID: "compactos_on", Group: "deep", Name: "Сжать файлы Windows (CompactOS)", Admin: true,
+		Desc:    "Windows сжимает свои программы и освобождает 2–5 ГБ. Полезно на маленьких дисках, на быстрых SSD почти не замедляет. Занимает 10–20 минут.",
+		Confirm: "Сжать системные файлы Windows? Это займёт 10–20 минут, компьютером можно пользоваться. Отменить можно кнопкой «Распаковать файлы Windows»."},
+	{ID: "compactos_off", Group: "deep", Name: "Распаковать файлы Windows", Admin: true,
+		Desc: "Отменяет CompactOS: файлы Windows снова займут полный размер."},
+
+	{ID: "sfc", Group: "repair", Name: "Проверить системные файлы (SFC)", Admin: true,
+		Desc: "Находит повреждённые файлы Windows и заменяет их исправными копиями. Занимает 10–20 минут."},
+	{ID: "dism_restore", Group: "repair", Name: "Восстановить образ Windows (DISM)", Admin: true,
+		Desc: "Чинит хранилище компонентов, из которого SFC берёт исправные файлы. Если SFC не смог всё исправить, запустите это, потом SFC ещё раз. Может скачивать файлы из Windows Update."},
+	{ID: "chkdsk", Group: "repair", Name: "Проверить системный диск на ошибки", Admin: true,
+		Desc: "Проверка файловой системы без перезагрузки и без остановки работы. Если найдутся ошибки, Windows предложит исправить их при перезагрузке."},
+
 	{ID: "restore_point", Group: "service", Name: "Создать точку восстановления", Admin: true,
 		Desc: "Снимок системных файлов перед серьёзными изменениями. Нужна включённая защита системы."},
 	{ID: "trim", Group: "service", Name: "Оптимизировать системный диск", Admin: true,
@@ -107,10 +120,13 @@ func runTool(j *Job, id string) (any, error) {
 	var err error
 	switch id {
 	case "dism_analyze":
+		j.Pct = true
 		err = runLogged(j, "Dism.exe", "/Online", "/Cleanup-Image", "/AnalyzeComponentStore")
 	case "dism_cleanup":
+		j.Pct = true
 		err = runLogged(j, "Dism.exe", "/Online", "/Cleanup-Image", "/StartComponentCleanup")
 	case "dism_resetbase":
+		j.Pct = true
 		err = runLogged(j, "Dism.exe", "/Online", "/Cleanup-Image", "/StartComponentCleanup", "/ResetBase")
 	case "hiber_off":
 		err = runLogged(j, "powercfg.exe", "/hibernate", "off")
@@ -120,9 +136,25 @@ func runTool(j *Job, id string) (any, error) {
 	case "hiber_on":
 		runLogged(j, "powercfg.exe", "/hibernate", "on")
 		err = runLogged(j, "powercfg.exe", "/hibernate", "/type", "full")
+	case "compactos_on":
+		j.Pct = true
+		err = runLogged(j, "compact.exe", "/CompactOS:always")
+	case "compactos_off":
+		j.Pct = true
+		err = runLogged(j, "compact.exe", "/CompactOS:never")
+	case "sfc":
+		j.Pct = true
+		err = runLogged(j, "sfc.exe", "/scannow")
+	case "dism_restore":
+		j.Pct = true
+		err = runLogged(j, "Dism.exe", "/Online", "/Cleanup-Image", "/RestoreHealth")
+	case "chkdsk":
+		j.Pct = true
+		err = runLogged(j, "chkdsk.exe", sysDrive, "/scan")
 	case "flushdns":
 		err = runLogged(j, "ipconfig.exe", "/flushdns")
 	case "trim":
+		j.Pct = true
 		err = runLogged(j, "defrag.exe", sysDrive, "/O", "/U")
 	case "restore_point":
 		err = runLogged(j, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
@@ -167,7 +199,7 @@ func runTool(j *Job, id string) (any, error) {
 	} else {
 		j.Log("Готово.")
 	}
-	if freed > 0 && (strings.HasPrefix(id, "dism_c") || strings.HasPrefix(id, "dism_r") || strings.HasPrefix(id, "hiber")) {
+	if freed > 0 && (strings.HasPrefix(id, "dism_c") || id == "dism_resetbase" || strings.HasPrefix(id, "hiber") || id == "compactos_on") {
 		addHistory(HistoryEntry{Time: time.Now(), Mode: "tool", Freed: freed, Items: []HistoryItem{{Name: t.Name, Freed: freed}}})
 	}
 	return map[string]any{"freed": freed, "ok": err == nil}, nil

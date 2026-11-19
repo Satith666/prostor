@@ -63,8 +63,8 @@ func listStoreApps() ([]StoreApp, error) {
 	}
 	var raw []struct {
 		Name, PackageFullName, PackageFamilyName, Publisher, Version, InstallLocation, SignatureKind string
-		IsFramework, NonRemovable                                                                  bool
-		Display                                                                                    string
+		IsFramework, NonRemovable                                                                    bool
+		Display                                                                                      string
 	}
 	script := `$start = @{}
 Get-StartApps | ForEach-Object { $f = ($_.AppID -split '!')[0]; if (-not $start.ContainsKey($f)) { $start[$f] = $_.Name } }

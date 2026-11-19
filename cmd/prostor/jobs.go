@@ -39,6 +39,8 @@ type Job struct {
 	err      string
 	cancel   chan struct{}
 	cancelOk sync.Once
+	// Pct: the console tool prints percentages, they become the progress
+	Pct bool
 }
 
 func (j *Job) SetPhase(p string)   { j.mu.Lock(); j.phase = p; j.mu.Unlock() }
@@ -216,8 +218,11 @@ func runLogged(j *Job, name string, args ...string) error {
 		var line []byte
 		replace := false
 		emit := func(rep bool) {
-			s := strings.TrimRight(winapi.DecodeConsole(line), " \t")
-			s = strings.ReplaceAll(s, "\x00", "")
+			s := strings.TrimRight(decodeLine(line, winapi.DecodeConsole), " \t")
+			if v, ok := progressOf(s); ok && j.Pct {
+				j.Total.Store(100)
+				j.Done.Store(int64(v))
+			}
 			if strings.TrimSpace(s) != "" {
 				if replace {
 					j.logReplace(s)

@@ -748,6 +748,18 @@ func RegSetBinary(root Root, path, name string, data []byte) error {
 	return setValue(root, path, name, syscall.REG_BINARY, data)
 }
 
+func RegDeleteValue(root Root, path, name string) error {
+	h, err := openKey(root, path, syscall.KEY_SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer syscall.RegCloseKey(h)
+	if r, _, _ := procRegDeleteValueW.Call(uintptr(h), uintptr(unsafe.Pointer(u16(name)))); r != 0 && r != 2 {
+		return syscall.Errno(r)
+	}
+	return nil
+}
+
 func RegDeleteTree(root Root, path string) error {
 	r, _, _ := procRegDeleteTreeW.Call(uintptr(root), uintptr(unsafe.Pointer(u16(path))))
 	if r != 0 && r != 2 {

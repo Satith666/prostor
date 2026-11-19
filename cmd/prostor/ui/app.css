@@ -567,3 +567,38 @@ tr:hover .ra, tr:focus-within .ra, .ra:focus-within { opacity: 1; }
 .left-row .pp { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .left-row small { display: block; color: var(--ink-3); font-size: 12px; margin-top: 2px; }
 .left-row b { font: 400 12.5px var(--f-num); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* система: диски и место под Windows */
+.disks { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.disk { background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px; padding: 16px 18px 14px; }
+.disk .dn { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disk .dm { display: flex; flex-wrap: wrap; gap: 2px 10px; color: var(--ink-3); font-size: 12.5px; margin-top: 3px; }
+.disk .st { color: var(--ink-2); }
+.disk .st.ok { color: var(--klein); }
+.disk .st.warn, .disk .st.bad, .disk .hot { color: var(--red); }
+.disk .bar.wear { height: 4px; margin: 14px 0 2px; }
+.disk .bar.wear i { background: var(--klein); }
+.disk .bar.wear.hot i { background: var(--red); }
+.disk dl { margin: 10px 0 0; display: grid; gap: 4px; }
+.disk dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.disk dt { color: var(--ink-3); }
+.disk dd { margin: 0; text-align: right; white-space: nowrap; }
+.disk p { margin-top: 12px; }
+.tool.sp { grid-template-columns: minmax(0, 1fr) 96px auto; }
+.tool.sp .fig { font: 400 17px var(--f-num); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.tool.sp .fig.word { font: 400 13px var(--f-ui); color: var(--ink-2); }
+.tbl td.cut { max-width: 0; width: 100%; }
+.tool.sp .sp-acts { display: flex; gap: 6px; justify-content: flex-end; min-width: 120px; }
+.tool.sp .path { display: block; margin-top: 4px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { .tool.sp { grid-template-columns: minmax(0, 1fr) auto; row-gap: 10px; } .tool.sp .sp-acts { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* автозагрузка: время загрузки */
+.boot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 40px; margin: 0 0 20px; }
+.boot-fig { display: grid; gap: 4px; }
+.boot-fig b { font: 400 34px/1 var(--f-num); font-variant-numeric: tabular-nums; }
+.boot-fig span, .boot-split span { color: var(--ink-2); font-size: 13px; }
+.boot-split { display: grid; gap: 6px; min-width: 260px; flex: 1; max-width: 420px; }
+.boot-split .bar { height: 4px; background: var(--fill-2); }
+.boot-split .bar i { background: var(--klein); }
+.page > .note + .seg, .boot + .seg { margin-top: 4px; }
+.slow { font-size: 12px; color: var(--red); margin-left: 6px; white-space: nowrap; }

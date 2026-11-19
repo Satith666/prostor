@@ -213,7 +213,7 @@ const note = (icon, html, bad) => `<div class="note${bad ? ' bad' : ''}">${ic(ic
 const NAV = [
   ['overview', 'Обзор'], ['advice', 'Рекомендации'], null,
   ['clean', 'Очистка'], ['analyze', 'Анализ диска'], ['dupes', 'Дубликаты'], null,
-  ['programs', 'Программы'], ['startup', 'Автозагрузка'], ['tools', 'Инструменты'], null,
+  ['programs', 'Программы'], ['startup', 'Автозагрузка'], ['tools', 'Система'], null,
   ['history', 'История'], ['quarantine', 'Карантин'], ['settings', 'Настройки'],
 ];
 const PAGES = {};
@@ -1645,6 +1645,7 @@ async function loadPrograms() {
 // Потом выбор остатков: то, что точно принадлежало программе, отмечено заранее.
 const LEFT_KIND = { folder: 'Папка', registry: 'Реестр', service: 'Служба', task: 'Задание', shortcut: 'Ярлык' };
 const nProgs = (n) => fmtNum(n) + ' ' + plural(n, 'программа', 'программы', 'программ');
+const nProgsGen = (n) => fmtNum(n) + ' ' + plural(n, 'программы', 'программ', 'программ');
 
 function confirmUninstall(list) {
   return new Promise((resolve) => {
@@ -1786,7 +1787,7 @@ async function removeApps(list) {
   else toast(`${one ? 'Приложение удалено' : 'Приложения удалены'}, освобождено около ${fmtSize(freed)}`);
 }
 
-const prTabsHTML = () => `<div class="seg" style="margin-bottom:22px">${[['win', 'Программы'], ['store', 'Приложения Microsoft Store']].map(([v, n]) => `<button class="${(S.prTab || 'win') === v ? 'on' : ''}" data-act="prTab" data-v="${v}">${n}</button>`).join('')}</div>`;
+const prTabsHTML = () => `<div class="seg" style="margin-bottom:22px">${[['win', 'Программы'], ['store', 'Приложения Microsoft Store'], ['upd', 'Обновления']].map(([v, n]) => `<button class="${(S.prTab || 'win') === v ? 'on' : ''}" data-act="prTab" data-v="${v}">${n}</button>`).join('')}</div>`;
 const prTabAct = (el) => { S.prTab = el.dataset.v; render(false); };
 
 function selBar(n, size, what) {
@@ -1842,8 +1843,54 @@ function filterRows(q) {
   const e = $('#prEmpty'); if (e) e.hidden = shown > 0 || !$('#prBody');
 }
 
+// ---- обновления программ через winget
+async function loadUpdates() {
+  S.upd = { loading: true, sel: new Set() };
+  rerender('programs');
+  let s;
+  try { s = await startJob('upgrades', '/api/upgrades'); } catch (e) { s = { err: e.message }; }
+  S.upd = { list: s.err ? [] : s.result || [], err: s.err || '', sel: new Set(), at: Date.now() };
+  rerender('programs');
+}
+
+function updatesPage(m) {
+  const u = S.upd;
+  if (!u || u.loading) {
+    m.innerHTML = `<div class="page wide">${head('Программы', 'Проверяем обновления через winget, это занимает до минуты…')}${prTabsHTML()}<div class="prog indet" style="max-width:420px"><i></i></div></div>`;
+    acts({ prTab: prTabAct });
+    if (!u) loadUpdates();
+    return;
+  }
+  const rows = u.list.map((x) => `<tr><td class="w"><input type="checkbox" class="ck" data-act="upSel" data-id="${esc(x.id)}" ${u.sel.has(x.id) ? 'checked' : ''} aria-label="${esc(x.name)}"></td>
+      <td><div class="nm">${ic('program')}<div class="tx"><div>${esc(x.name)}</div><small>${esc(x.id)}</small></div></div></td>
+      <td class="w num small">${esc(x.version)}</td><td class="w num">${esc(x.available)}</td>
+      <td class="w"><button class="btn sm" data-act="upOne" data-id="${esc(x.id)}">Обновить</button></td></tr>`).join('');
+  const bar = () => (u.sel.size ? `<div class="sum"><b>${u.sel.size}</b><span>${plural(u.sel.size, 'программа выбрана', 'программы выбраны', 'программ выбрано')}</span></div><span class="grow"></span>
+    <button class="btn" data-act="selNone">Снять выбор</button><button class="btn primary lg" data-act="upSelRun">${ic('download')}Обновить выбранные</button>` : '');
+  const lead = u.err ? '' : u.list.length ? `Для ${nProgsGen(u.list.length)} есть новые версии. Обновление идёт тихо, без окон установщиков.` : 'Все программы, которые знает winget, обновлены.';
+  m.innerHTML = `<div class="page wide">${head('Программы', lead, `<button class="btn" data-act="upReload">${ic('refresh')}Проверить снова</button>`)}
+    ${prTabsHTML()}
+    ${u.err ? note('info', esc(u.err)) : ''}
+    ${u.list.length ? `<table class="tbl"><thead><tr><th></th><th>Программа</th><th>Сейчас</th><th>Новая версия</th><th></th></tr></thead><tbody id="prBody">${rows}</tbody></table>` : ''}
+    <p class="small faint" style="margin-top:16px;max-width:70ch">Обновления берутся из каталога winget (Windows Package Manager). Перед обновлением закройте программу, иначе установщик может попросить перезагрузку.</p>
+    <div class="actionbar" id="prBar" ${u.sel.size ? '' : 'hidden'}>${bar()}</div></div>`;
+  const upd = () => { const b = $('#prBar'); b.innerHTML = bar(); b.hidden = !u.sel.size; };
+  const run = (ids) => runTool({ name: ids.length > 1 ? `Обновление ${nProgsGen(ids.length)}` : `Обновление ${(u.list.find((x) => x.id === ids[0]) || {}).name || ids[0]}`, kind: 'upgrade',
+    after: () => { S.upd = null; S.pr && (S.pr.list = null); rerender('programs'); } }, '/api/upgrades/run', { ids });
+  acts({
+    prTab: prTabAct,
+    upReload: () => loadUpdates(),
+    upSel: (el) => { if (el.checked) u.sel.add(el.dataset.id); else u.sel.delete(el.dataset.id); upd(); },
+    selNone: () => { u.sel.clear(); $$('#prBody .ck').forEach((c) => { c.checked = false; }); upd(); },
+    upOne: (el) => run([el.dataset.id]),
+    upSelRun: () => run([...u.sel]),
+  });
+  ready(m);
+}
+
 PAGES.programs = (m) => {
   if (S.prTab === 'store') return appsPage(m);
+  if (S.prTab === 'upd') return updatesPage(m);
   const p = S.pr;
   if (!p || !p.list) {
     m.innerHTML = loadingPage('Читаем список программ…');
@@ -1896,40 +1943,72 @@ PAGES.programs = (m) => {
 };
 
 // ============================================================ АВТОЗАГРУЗКА
+const ST_KINDS = [['all', 'Все'], ['apps', 'Программы'], ['task', 'Задания'], ['service', 'Службы']];
+const fmtSec = (x) => (x >= 10 ? Math.round(x) : x.toFixed(1).replace('.', ',')) + ' с';
 PAGES.startup = (m) => {
   if (!S.st) {
-    m.innerHTML = loadingPage();
-    api('/api/startup').then((x) => { S.st = x || []; }, (e) => { toast(e.message, true); S.st = []; }).then(() => rerender('startup'));
+    m.innerHTML = loadingPage('Собираем всё, что запускается с Windows…');
+    if (!S.stLoading) {
+      S.stLoading = true;
+      api('/api/startup').then((x) => { S.st = x || { items: [] }; }, (e) => { toast(e.message, true); S.st = { items: [] }; }).then(() => { S.stLoading = false; rerender('startup'); });
+    }
     return;
   }
   const admin = S.info && S.info.admin;
-  const on = S.st.filter((x) => x.enabled).length;
-  const rows = S.st.map((x, k) => {
+  const all = S.st.items || [];
+  const f = S.stKind || 'all';
+  const of = (x) => (x.kind === 'task' ? 'task' : x.kind === 'service' ? 'service' : 'apps');
+  const list = all.filter((x) => f === 'all' || of(x) === f);
+  const on = all.filter((x) => x.enabled).length;
+  const slow = all.filter((x) => x.enabled && !x.delayed && x.slow >= 1000).sort((a, b) => b.slow - a.slow);
+  const b = S.st.boot || {};
+  const state = (x) => (!x.enabled ? '<span class="faint">отключено</span>' : x.delayed ? 'отложено' : 'включено');
+  const rows = list.map((x) => {
+    const k = all.indexOf(x);
     const locked = x.needsAdmin && !admin;
+    const delayBtn = x.canDelay && x.enabled && !(x.kind === 'service' ? !admin : locked && !x.delayed)
+      ? `<button class="btn sm quiet" data-act="delay" data-i="${k}" title="${x.delayed ? 'Запускать сразу при входе' : 'Запускать через полторы минуты после входа, когда Windows уже загрузилась'}">${ic('clock')}${x.delayed ? 'Сразу' : 'Отложить'}</button>` : '';
     return `<tr><td class="w"><input type="checkbox" class="sw" data-act="toggle" data-i="${k}" ${x.enabled ? 'checked' : ''} ${locked ? 'disabled title="Нужны права администратора"' : ''} aria-label="${esc(x.name)}"></td>
-      <td><div class="nm"><div class="tx"><div>${esc(x.name)}${x.exists ? '' : ' <span class="faint small">файл не найден</span>'}</div><small title="${esc(x.command)}">${esc(x.command)}</small></div></div></td>
+      <td class="cut"><div class="nm"><div class="tx"><div>${esc(x.name)}${x.exists ? '' : ' <span class="faint small">файл не найден</span>'}${x.slow >= 1000 && x.enabled && !x.delayed ? ` <span class="slow" title="По данным Windows">замедляет загрузку на ${fmtSec(x.slow / 1000)}</span>` : ''}</div><small title="${esc(x.command)}">${esc(x.command)}</small></div></div></td>
       <td class="w small faint">${esc(x.source)}</td>
-      <td class="w small" data-state="${k}">${x.enabled ? 'включено' : '<span class="faint">отключено</span>'}</td>
-      <td class="w"><div class="ra">${x.exists && x.path ? `<button class="btn sm icon quiet" title="Показать в Проводнике" data-act="reveal" data-path="${esc(x.path)}">${ic('reveal')}</button>` : ''}</div></td></tr>`;
+      <td class="w small" data-state="${k}">${state(x)}</td>
+      <td class="w"><div class="row-flex" style="gap:4px;justify-content:flex-end">${delayBtn}${x.exists && x.path ? `<button class="btn sm icon quiet" title="Показать в Проводнике" data-act="reveal" data-path="${esc(x.path)}">${ic('reveal')}</button>` : ''}</div></td></tr>`;
   }).join('');
-  m.innerHTML = `<div class="page wide">${head('Автозагрузка', `Программы, которые стартуют вместе с Windows: включено ${on} из ${S.st.length}. Отключение ничего не удаляет и работает как в Диспетчере задач.`,
+  const boot = b.known ? `<div class="boot"><div class="boot-fig"><b class="num">${fmtSec(b.last)}</b><span>заняла последняя загрузка${b.typical && Math.abs(b.typical - b.last) > 2 ? `, обычно ${fmtSec(b.typical)}` : ''}</span></div>
+      <div class="boot-split"><div class="bar"><i style="width:${pct(b.main, b.main + b.post)}%"></i></div><span>${fmtSec(b.main)} до рабочего стола, ещё ${fmtSec(b.post)} до полной готовности</span></div></div>` : '';
+  const advice = slow.length ? note('clock', `Windows отмечает, что загрузку замедляют: ${slow.slice(0, 4).map((x) => `<b>${esc(x.name)}</b> (${fmtSec(x.slow / 1000)})`).join(', ')}. Их можно отложить: они запустятся через полторы минуты после входа, когда система уже готова.`) : '';
+  m.innerHTML = `<div class="page wide">${head('Автозагрузка', `Всё, что стартует вместе с Windows: включено ${on} из ${all.length}. Отключение ничего не удаляет и работает как в Диспетчере задач.`,
     `<button class="btn" data-act="reload">${ic('refresh')}Обновить</button>`)}
-    ${adminBanner('элементы для всех пользователей не изменить.')}
-    <table class="tbl"><thead><tr><th></th><th>Программа</th><th>Где прописана</th><th>Состояние</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="5" class="faint">Автозагрузка пуста</td></tr>'}</tbody></table>
-    <p class="small faint" style="margin-top:16px;max-width:70ch">Отключайте то, что не нужно сразу после включения: лаунчеры игр, мессенджеры, помощники обновлений. Антивирус и драйверы оставьте.</p></div>`;
+    ${adminBanner('элементы для всех пользователей, задания и службы не изменить.')}
+    ${boot}${advice}
+    <div class="seg" style="margin-bottom:18px">${ST_KINDS.map(([v, n]) => `<button class="${f === v ? 'on' : ''}" data-act="kind" data-v="${v}">${n} <span class="faint">${v === 'all' ? all.length : all.filter((x) => of(x) === v).length}</span></button>`).join('')}</div>
+    <table class="tbl"><thead><tr><th></th><th>Что запускается</th><th>Где прописано</th><th>Состояние</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="faint">Здесь пусто</td></tr>'}</tbody></table>
+    <p class="small faint" style="margin-top:16px;max-width:70ch">Отключайте то, что не нужно сразу после включения: лаунчеры игр, мессенджеры, помощники обновлений. Антивирус, драйверы и службы устройств оставьте. Отключённая служба не удаляется: она переводится на ручной запуск и стартует, когда понадобится программе.</p></div>`;
   acts({
     reload: () => { S.st = null; render(false); },
+    kind: (el) => { S.stKind = el.dataset.v; render(false); },
     toggle: async (el) => {
-      const x = S.st[+el.dataset.i];
+      const x = all[+el.dataset.i];
       el.disabled = true;
       try {
         await api('/api/startup/toggle', { id: x.id, enabled: el.checked });
         x.enabled = el.checked;
+        if (!x.enabled) x.delayed = false;
         toast(`${x.name}: ${el.checked ? 'включено' : 'отключено'}`);
       } catch (e) { toast(e.message, true); el.checked = !el.checked; }
       el.disabled = false;
-      const c = $(`[data-state="${el.dataset.i}"]`); if (c) c.innerHTML = x.enabled ? 'включено' : '<span class="faint">отключено</span>';
+      render(false);
+    },
+    delay: async (el) => {
+      const x = all[+el.dataset.i];
+      el.disabled = true;
+      try {
+        await api('/api/startup/delay', { id: x.id, delayed: !x.delayed });
+        x.delayed = !x.delayed;
+        toast(x.delayed ? `${x.name} запустится через полторы минуты после входа` : `${x.name} снова запускается сразу`);
+      } catch (e) { toast(e.message, true); }
+      render(false);
     },
   });
   ready(m);
@@ -1942,12 +2021,12 @@ async function runToolById(id) {
   if (!t) { toast('Инструмент не найден', true); return; }
   await runTool(t);
 }
-async function runTool(t) {
+async function runTool(t, url, body) {
   if (t.admin && S.info && !S.info.admin) {
-    info('Нужны права администратора', '<p>Этот инструмент меняет системные настройки. Перезапустите программу с правами администратора: ссылка внизу слева.</p>');
+    info('Нужны права администратора', '<p>Это действие меняет системные настройки. Перезапустите программу с правами администратора: ссылка внизу слева.</p>');
     return;
   }
-  if (t.confirm && !(await ask(t.name, `<p>${esc(t.confirm)}</p>`, 'Запустить'))) return;
+  if (t.confirm && !(await ask(t.name, `<p>${esc(t.confirm)}</p>`, t.ok || 'Запустить'))) return;
   if (t.open) {
     try { await api('/api/tools/run', { id: t.id }); toast('Открыто: ' + t.name); } catch (e) { toast(e.message, true); }
     return;
@@ -1957,18 +2036,23 @@ async function runTool(t) {
     <div class="btns"><button class="btn" id="tBtn">${ic('stop')}Остановить</button></div>`, { wide: true, sticky: true });
   const btn = $('#tBtn', d.el);
   let finished = false;
-  btn.onclick = () => (finished ? d.close() : cancelJob('tool'));
+  const kind = t.kind || 'tool';
+  btn.onclick = () => (finished ? d.close() : cancelJob(kind));
   const draw = (s) => {
     const con = $('#tCon', d.el);
     if (!con) return;
     const atBottom = con.scrollHeight - con.scrollTop - con.clientHeight < 30;
     con.innerHTML = s.lines.map((l) => `<div class="${/ошибк|error|fail|не удалось/i.test(l) ? 'err' : /готово|успешно|завершен|completed|success/i.test(l) ? 'ok' : ''}">${esc(l)}</div>`).join('');
     if (atBottom) con.scrollTop = con.scrollHeight;
+    const pr = $('#tProg', d.el);
+    if (pr && s.total > 0) { pr.classList.remove('indet'); $('i', pr).style.width = pct(s.done, s.total) + '%'; }
+    const ph = $('#tPhase', d.el);
+    if (ph && s.running) ph.textContent = (s.phase && s.phase !== t.name ? s.phase : 'Выполняется') + (s.total > 0 ? `: ${Math.round(pct(s.done, s.total))}%` : '…');
   };
-  dialogHooks.tool = draw;
+  dialogHooks[kind] = draw;
   let s;
-  try { s = await startJob('tool', '/api/tools/run', { id: t.id }); } catch (e) { delete dialogHooks.tool; d.close(); toast(e.message, true); return; }
-  delete dialogHooks.tool;
+  try { s = await startJob(kind, url || '/api/tools/run', body || { id: t.id }); } catch (e) { delete dialogHooks[kind]; d.close(); toast(e.message, true); return; }
+  delete dialogHooks[kind];
   finished = true;
   draw(s);
   const r = s.result || {};
@@ -1979,30 +2063,151 @@ async function runTool(t) {
   btn.focus();
   await refreshInfo();
   S.tools = null;
+  S.sys = null;
   S.hist = null;
+  if (t.after) t.after(s);
   if (S.page === 'tools') render(false);
 }
 
-PAGES.tools = (m) => {
-  if (!S.tools) {
-    m.innerHTML = loadingPage();
-    api('/api/tools').then((x) => { S.tools = x; rerender('tools'); }, (e) => toast(e.message, true));
+// ---- состояние дисков
+const HEALTH = { Healthy: ['ok', 'Исправен'], Warning: ['warn', 'Есть предупреждения'], Unhealthy: ['bad', 'Неисправен: скопируйте важные данные'] };
+function diskCard(d, admin) {
+  const [cls, txt] = HEALTH[d.health] || ['', 'Состояние неизвестно'];
+  const hot = d.temp && d.temp >= (d.media === 'HDD' ? 55 : 70);
+  const facts = [];
+  if (d.wear >= 0) facts.push(['Ресурс', d.wear ? `израсходован на ${d.wear}%` : 'почти не израсходован']);
+  if (d.temp) facts.push(['Температура', `<span class="${hot ? 'hot' : ''}">${d.temp} °C</span>${d.tempMax > d.temp ? `, максимум ${d.tempMax} °C` : ''}`]);
+  if (d.hours) facts.push(['Наработка', `${fmtNum(d.hours)} ${plural(d.hours, 'час', 'часа', 'часов')}`]);
+  if (d.readErr || d.writeErr) facts.push(['Ошибки', `<span class="hot">${fmtNum(d.readErr + d.writeErr)} неисправленных</span>`]);
+  const kind = [d.media === 'SSD' ? 'SSD' : d.media === 'HDD' ? 'Жёсткий диск' : '', d.bus, d.size ? fmtSize(d.size) : ''].filter(Boolean).join(', ');
+  return `<div class="disk"><b class="dn" title="${esc(d.name)}">${esc(d.name || 'Диск')}</b><div class="dm"><span class="st ${cls}">${txt}</span><span>${esc(kind)}</span></div>
+    ${d.wear >= 0 ? `<div class="bar wear ${d.wear >= 80 ? 'hot' : ''}"><i style="width:${Math.max(1, d.wear)}%"></i></div>` : ''}
+    ${facts.length ? `<dl>${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`
+      : `<p class="small faint">${admin ? 'Диск не сообщает ресурс и температуру.' : 'Ресурс и температура видны с правами администратора.'}</p>`}</div>`;
+}
+
+// ---- старые драйверы
+async function oldDrivers() {
+  const d = openDialog(`<h2>Старые драйверы</h2><p id="drPhase">Читаем хранилище драйверов…</p><div class="prog indet" style="margin:16px 0 4px"><i></i></div>`, { sticky: true });
+  dialogHooks.drivers = (s) => { const p = $('#drPhase', d.el); if (p && s.phase) p.textContent = s.phase + (s.total ? `: ${s.done} из ${s.total}` : '…'); };
+  let s;
+  try { s = await startJob('drivers', '/api/system/drivers'); } catch (e) { s = { err: e.message }; }
+  delete dialogHooks.drivers;
+  d.close();
+  if (s.err) { toast(s.err, true); return; }
+  const rep = s.result || { packages: [] };
+  const old = rep.packages.filter((p) => p.old);
+  if (!old.length) {
+    info('Старых драйверов нет', `<p>В хранилище ${rep.packages.length} ${plural(rep.packages.length, 'пакет', 'пакета', 'пакетов')} сторонних драйверов: каждый используется устройством или оставлен как предыдущая версия для отката.</p>`);
     return;
   }
-  const h = S.tools.hiber || {};
-  const groups = [['deep', 'Глубокая очистка системы'], ['service', 'Обслуживание'], ['open', 'Системные окна Windows']];
-  const rows = (g) => S.tools.tools.filter((t) => t.group === g).map((t) => {
-    let extra = '';
-    if (t.id.startsWith('hiber_')) extra = h.enabled ? ` Сейчас гибернация включена${h.size ? `, файл занимает ${fmtSize(h.size)}` : ''}.` : ' Сейчас гибернация выключена.';
-    const locked = t.admin && S.info && !S.info.admin;
+  const sel = new Set(old.map((p) => p.inf));
+  const row = (p) => `<label class="left-row"><input type="checkbox" class="ck" data-inf="${esc(p.inf)}" ${p.old ? 'checked' : 'disabled'}>
+      <span class="k">${esc(p.class || '')}</span><span class="p"><span>${esc([p.provider, p.original + ' ' + p.version].filter(Boolean).join(', '))}</span><small>${p.date ? fmtDate(p.date) + ', ' : ''}${esc(p.why)}</small></span><b>${fmtSize(p.size)}</b></label>`;
+  const dd = openDialog(`<h2>Старые драйверы: ${fmtSize(rep.oldSize)}</h2>
+    <p>После каждого обновления драйвера Windows хранит прежнюю версию. Prostor оставляет версию, которую использует устройство, и одну предыдущую для отката. Windows не даст удалить драйвер, который сейчас в работе.</p>
+    <div class="left-list">${old.map(row).join('')}<h3>Остаются</h3>${rep.packages.filter((p) => !p.old).map(row).join('')}</div>
+    <div class="btns"><button class="btn" data-v="0">Отмена</button><button class="btn primary" id="drGo"></button></div>`, { wide: true });
+  const sync = () => {
+    const size = sum(old.filter((p) => sel.has(p.inf)), (p) => p.size);
+    const b = $('#drGo', dd.el); b.disabled = !sel.size;
+    b.innerHTML = `${ic('trash')}Удалить ${sel.size} ${plural(sel.size, 'пакет', 'пакета', 'пакетов')}, ${fmtSize(size)}`;
+  };
+  $$('.left-row .ck', dd.el).forEach((c) => { c.onchange = () => { if (c.checked) sel.add(c.dataset.inf); else sel.delete(c.dataset.inf); sync(); }; });
+  sync();
+  $('.btns [data-v="0"]', dd.el).onclick = () => dd.close();
+  $('#drGo', dd.el).onclick = async () => {
+    dd.close();
+    toast('Удаляем старые драйверы…');
+    let r;
+    try { r = await startJob('driversrm', '/api/system/drivers/remove', { infs: [...sel] }); } catch (e) { toast(e.message, true); return; }
+    const x = r.result || {};
+    if (r.err) toast(r.err, true);
+    else if ((x.failed || []).length) info('Удалено не всё', `<p>Удалено ${x.removed}, освобождено ${fmtSize(x.freed)}. Windows не разрешила удалить:</p><ul class="reslist">${x.failed.map((f) => `<li><span>${esc(f)}</span></li>`).join('')}</ul>`);
+    else toast(`Удалено ${x.removed} ${plural(x.removed, 'пакет', 'пакета', 'пакетов')}, освобождено ${fmtSize(x.freed)}`);
+    refreshInfo(); S.hist = null;
+  };
+}
+
+PAGES.tools = (m) => {
+  if (!S.tools || !S.sys) {
+    m.innerHTML = loadingPage('Смотрим диски и системные файлы…');
+    if (!S.sysLoading) {
+      S.sysLoading = true;
+      Promise.all([S.tools || api('/api/tools'), S.sys || api('/api/system')]).then(([t, x]) => { S.tools = t; S.sys = x; }, (e) => { toast(e.message, true); S.tools = S.tools || { tools: [] }; S.sys = S.sys || { disks: [], shadows: [], vdisks: [] }; })
+        .then(() => { S.sysLoading = false; rerender('tools'); });
+    }
+    return;
+  }
+  const x = S.sys;
+  const admin = S.info && S.info.admin;
+  const tool = (id) => S.tools.tools.find((t) => t.id === id) || { id, name: id };
+  const lockAttr = admin ? '' : 'disabled title="Нужны права администратора"';
+  const runBtn = (id, label, primary) => `<button class="btn sm ${primary ? 'primary' : ''}" data-act="run" data-id="${id}" ${tool(id).admin ? lockAttr : ''}>${esc(label)}</button>`;
+  const row = (title, fig, desc, btns) => `<div class="tool sp"><div><h3>${title}</h3><p>${desc}</p></div><b class="fig num${/^\d/.test(fig) ? '' : ' word'}">${fig}</b><div class="sp-acts">${btns}</div></div>`;
+  const h = x.hiber || {};
+  const rows = [];
+  for (const sh of (x.shadows || []).filter((s) => s.drive)) {
+    rows.push(row(`Точки восстановления, диск ${esc(sh.drive)}`, fmtSize(sh.used),
+      `${sh.count} ${plural(sh.count, 'точка', 'точки', 'точек')}${sh.max > 0 ? `, место ограничено ${fmtSize(sh.max)}` : ', место не ограничено'}. Последняя точка нужна, чтобы откатить неудачное обновление или драйвер, старые обычно бесполезны.`,
+      `${sh.count > 1 ? `<button class="btn sm" data-act="shTrim" data-drive="${esc(sh.drive)}" ${lockAttr}>Оставить последнюю</button>` : ''}<button class="btn sm" data-act="shLimit" data-drive="${esc(sh.drive)}" ${lockAttr}>Ограничить 5%</button>`));
+  }
+  if (x.reserved && x.reserved.known) {
+    rows.push(row('Зарезервированное хранилище', x.reserved.enabled ? (x.reserved.size ? fmtSize(x.reserved.size) : 'включено') : 'выключено',
+      'Место, которое Windows держит для установки обновлений. Если его отключить, на маленьком диске обновления могут не поставиться.',
+      `<button class="btn sm" data-act="resv" data-on="${x.reserved.enabled ? 0 : 1}" ${lockAttr}>${x.reserved.enabled ? 'Отключить' : 'Включить'}</button>`));
+  }
+  rows.push(row('Файл гибернации', h.enabled ? fmtSize(h.size) : 'выключен',
+    h.enabled ? 'hiberfil.sys хранит содержимое памяти для гибернации и быстрого запуска. Уменьшенный файл вдвое меньше и быстрый запуск сохраняет.' : 'Гибернация и быстрый запуск выключены, файла нет.',
+    h.enabled ? runBtn('hiber_reduced', 'Уменьшить') + runBtn('hiber_off', 'Отключить') : runBtn('hiber_on', 'Включить')));
+  rows.push(row('Файл подкачки', x.pagefile ? fmtSize(x.pagefile) : '—',
+    `pagefile.sys и swapfile.sys. ${x.pageAuto ? 'Размер выбирает Windows' : 'Размер задан вручную'}${x.pagePeak ? `, пик использования ${fmtSize(x.pagePeak)}` : ''}. Удалять файл подкачки не стоит: при нехватке памяти программы начнут закрываться.`,
+    runBtn('pagefile', 'Настроить')));
+  if (x.compactOS) {
+    rows.push(row('Сжатие файлов Windows (CompactOS)', x.compactOS === 'on' ? 'включено' : 'выключено',
+      x.compactOS === 'on' ? 'Программы Windows хранятся сжатыми, это экономит 2–5 ГБ.' : 'Windows может хранить свои программы сжатыми и освободить 2–5 ГБ. Полезно на дисках до 128 ГБ.',
+      x.compactOS === 'on' ? runBtn('compactos_off', 'Распаковать') : runBtn('compactos_on', 'Сжать')));
+  }
+  rows.push(row('Старые драйверы', '', 'Прежние версии драйверов видеокарты, принтеров и других устройств. Версия в работе и одна предыдущая остаются.',
+    `<button class="btn sm" data-act="drivers" ${lockAttr}>Найти</button>`));
+  for (const v of x.vdisks || []) {
+    rows.push(row(`Диск ${v.kind === 'docker' ? 'Docker' : 'WSL'}: ${esc(v.name)}`, fmtSize(v.size),
+      `Виртуальный диск растёт, но сам не уменьшается, даже когда файлы внутри удалены. Сжатие остановит WSL${v.kind === 'docker' ? ' и Docker' : ''} на пару минут. <span class="path small">${ltr(v.path)}</span>`,
+      `<button class="btn sm" data-act="vdisk" data-path="${esc(v.path)}" ${lockAttr}>Сжать</button>`));
+  }
+  const inRows = new Set(['hiber_reduced', 'hiber_off', 'hiber_on', 'pagefile', 'compactos_on', 'compactos_off']);
+  const groups = [['repair', 'Проверка и восстановление'], ['deep', 'Глубокая очистка системы'], ['service', 'Обслуживание'], ['open', 'Системные окна Windows']];
+  const trows = (g) => S.tools.tools.filter((t) => t.group === g && !inRows.has(t.id)).map((t) => {
+    const locked = t.admin && !admin;
     const tags = [t.caution ? 'осторожно' : '', locked ? 'нужны права' : ''].filter(Boolean).join(', ');
-    return `<div class="tool"><div><h3>${esc(t.name)}${tags ? `<span class="tags">${tags}</span>` : ''}</h3><p>${esc(t.desc + extra)}</p></div>
+    return `<div class="tool"><div><h3>${esc(t.name)}${tags ? `<span class="tags">${tags}</span>` : ''}</h3><p>${esc(t.desc)}</p></div>
       <button class="btn ${t.open ? '' : 'primary'}" data-act="run" data-id="${t.id}" ${locked ? 'disabled' : ''}>${t.open ? ic('external') + 'Открыть' : ic('play') + 'Запустить'}</button></div>`;
   }).join('');
-  m.innerHTML = `<div class="page">${head('Инструменты', 'Средства Windows для глубокой очистки и обслуживания, с понятными описаниями.')}
-    ${adminBanner('большинство инструментов недоступно.')}
-    ${groups.map(([g, n]) => `<h2 class="sec">${n}</h2><div class="panel">${rows(g)}</div>`).join('')}</div>`;
-  acts({ run: (el) => runToolById(el.dataset.id) });
+  const trim = x.trim === 'on' ? 'TRIM включён: SSD узнаёт об удалённых файлах и сохраняет скорость.' : x.trim === 'off' ? 'TRIM выключен: SSD со временем замедлится. Включите командой «fsutil behavior set DisableDeleteNotify 0».' : '';
+  m.innerHTML = `<div class="page">${head('Система', 'Здоровье дисков, место, которое занимает сама Windows, и средства проверки и обслуживания.', `<button class="btn" data-act="reload">${ic('refresh')}Обновить</button>`)}
+    ${adminBanner('часть сведений и действий недоступна.')}
+    <h2 class="sec">Диски</h2>
+    ${x.disks && x.disks.length ? `<div class="disks">${x.disks.map((d) => diskCard(d, admin)).join('')}</div>` : '<p class="faint">Windows не сообщила сведения о дисках.</p>'}
+    ${trim && (x.disks || []).some((d) => d.media === 'SSD') ? `<p class="small ${x.trim === 'off' ? '' : 'faint'}" style="margin-top:10px">${trim}</p>` : ''}
+    <h2 class="sec">Место, которое занимает Windows</h2><div class="panel">${rows.join('')}</div>
+    ${groups.map(([g, n]) => { const r = trows(g); return r ? `<h2 class="sec">${n}</h2><div class="panel">${r}</div>` : ''; }).join('')}</div>`;
+  acts({
+    reload: () => { S.sys = null; render(false); },
+    run: (el) => runToolById(el.dataset.id),
+    drivers: () => oldDrivers(),
+    vdisk: (el) => runTool({ name: 'Сжатие виртуального диска', admin: true, confirm: 'WSL и Docker будут остановлены на время сжатия. Несохранённая работа в них пропадёт. Продолжить?', ok: 'Сжать' }, '/api/system/vdisk', { path: el.dataset.path }),
+    shTrim: (el) => runTool({ name: `Старые точки восстановления, диск ${el.dataset.drive}`, admin: true, confirm: `Удалить все точки восстановления диска ${el.dataset.drive}, кроме самой новой? Откатиться к удалённым точкам будет нельзя.`, ok: 'Удалить старые' }, '/api/system/shadows', { drive: el.dataset.drive }),
+    shLimit: async (el) => {
+      if (!(await ask('Ограничить место под точки восстановления?', `<p>Точки восстановления диска ${esc(el.dataset.drive)} смогут занимать не больше 5% его объёма. Когда место кончится, Windows сама удалит самые старые.</p>`, 'Ограничить'))) return;
+      try { await api('/api/system/shadows', { drive: el.dataset.drive, limit: 5 }); toast('Место под точки восстановления ограничено'); S.sys = null; render(false); } catch (e) { toast(e.message, true); }
+    },
+    resv: async (el) => {
+      const on = el.dataset.on === '1';
+      if (!on && !(await ask('Отключить зарезервированное хранилище?', '<p>Windows перестанет держать место под обновления. Если на диске будет мало места, крупные обновления могут не установиться, пока его не освободить.</p>', 'Отключить'))) return;
+      el.disabled = true;
+      try { await api('/api/system/reserved', { enabled: on }); toast(on ? 'Зарезервированное хранилище включено' : 'Зарезервированное хранилище отключено'); S.sys = null; refreshInfo(); render(false); } catch (e) { el.disabled = false; toast(e.message, true); }
+    },
+  });
   ready(m);
 };
 

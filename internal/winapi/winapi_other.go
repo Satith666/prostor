@@ -178,6 +178,7 @@ func RegSetString(Root, string, string, string) error  { return errors.New("unsu
 func RegSetDword(Root, string, string, uint32) error   { return errors.New("unsupported") }
 func RegSetBinary(Root, string, string, []byte) error  { return errors.New("unsupported") }
 func RegDeleteTree(Root, string) error                 { return errors.New("unsupported") }
+func RegDeleteValue(Root, string, string) error        { return errors.New("unsupported") }
 
 func ExpandEnv(s string) string {
 	if !strings.Contains(s, "%") {

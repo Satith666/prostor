@@ -50,6 +50,8 @@ const ICONS = {
   auto: '<path d="M16.25 8.5A6.5 6.5 0 0 0 4.5 6.25M3.75 11.5a6.5 6.5 0 0 0 11.75 2.25"/><path class="b" d="M3 3.25v4.5h4.5zM17 16.75v-4.5h-4.5z"/>',
   user: '<rect x="6.5" y="2.75" width="7" height="7"/><path d="M3.25 17.25c.5-3.75 3.25-5.5 6.75-5.5s6.25 1.75 6.75 5.5"/>',
   power: '<path d="M10 2.5v7"/><path d="M6 5a6.25 6.25 0 1 0 8 0"/>',
+  clock: '<circle cx="10" cy="10" r="7.25"/><path d="M10 5.5V10l3 2"/>',
+  pulse: '<path d="M2.5 10.5h3l2-5 3.5 9 2-4h4.5"/>',
   pin: '<rect class="b" x="7.5" y="7.5" width="5" height="5"/>',
 
   // ---- типы файлов

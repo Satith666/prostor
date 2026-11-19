@@ -972,6 +972,98 @@ func (t *selfTest) systemChecks() {
 		}
 		return okf("%d элементов, включено %d", len(list), on)
 	})
+	timed("Автозагрузка: все источники и время загрузки", 20*time.Second, func() (string, string) {
+		rep := startupReport()
+		kinds := map[string]int{}
+		for _, it := range rep.Items {
+			kinds[it.Kind]++
+			if it.ID == "" || it.Name == "" {
+				return failf("элемент без имени: %+v", it)
+			}
+		}
+		boot := "время загрузки Windows не записала"
+		if rep.Boot.Known {
+			boot = fmt.Sprintf("последняя загрузка %.1f с", rep.Boot.Last)
+		}
+		return okf("реестр %d, папки %d, задания %d, службы %d, Store %d; %s", kinds["run"], kinds["folder"], kinds["task"], kinds["service"], kinds["appx"], boot)
+	})
+	if winapi.IsWindows && os.Getenv("CI") == "true" && isAdmin {
+		// on a throwaway CI machine: a test item goes to delayed start and back
+		t.check(g, "Отложенный запуск", func() (string, string) { return delayRoundTrip() })
+	}
+	timed("Диски и место под Windows", 25*time.Second, func() (string, string) {
+		st := systemState()
+		if len(st.Errors) > 0 {
+			return failf("%s", strings.Join(st.Errors, "; "))
+		}
+		if winapi.IsWindows && len(st.Disks) == 0 {
+			return failf("Windows не сообщила ни одного диска")
+		}
+		var ds []string
+		for _, d := range st.Disks {
+			x := d.Media + " " + d.Health
+			if d.Wear >= 0 {
+				x += fmt.Sprintf(", ресурс %d%%", d.Wear)
+			}
+			if d.Temp > 0 {
+				x += fmt.Sprintf(", %d°C", d.Temp)
+			}
+			ds = append(ds, strings.TrimSpace(x))
+		}
+		var sh int64
+		for _, s := range st.Shadows {
+			sh += s.Used
+		}
+		if winapi.IsWindows && st.CompactOS == "" {
+			return failf("не удалось узнать состояние CompactOS")
+		}
+		return okf("диски: %s; TRIM %q; точки восстановления %s; резерв %v %s; гибернация %s; подкачка %s; CompactOS %s; дисков WSL/Docker %d",
+			strings.Join(ds, " | "), st.Trim, human(sh), st.Reserved.Enabled, human(st.Reserved.Size), human(st.Hiber.Size), human(st.Pagefile), st.CompactOS, len(st.VDisks))
+	})
+	if winapi.IsWindows && isAdmin {
+		timed("Старые драйверы", 90*time.Second, func() (string, string) {
+			res, err := listDrivers(&Job{cancel: make(chan struct{})})
+			if err != nil {
+				return failf("%v", err)
+			}
+			rep := res.(*DriverReport)
+			used := 0
+			for _, p := range rep.Packages {
+				if p.InUse {
+					used++
+					if p.Old {
+						return failf("драйвер в работе отмечен к удалению: %s", p.Inf)
+					}
+				}
+			}
+			return okf("пакетов %d, в работе %d, старых %d на %s", len(rep.Packages), used, rep.Old, human(rep.OldSize))
+		})
+	}
+	timed("Приложения Microsoft Store", 30*time.Second, func() (string, string) {
+		list, err := listStoreApps()
+		if err != nil {
+			return failf("%v", err)
+		}
+		var names []string
+		for i, a := range list {
+			if i < 4 {
+				names = append(names, a.Name)
+			}
+		}
+		return okf("%d: %s", len(list), strings.Join(names, ", "))
+	})
+	if !t.quick {
+		timed("Обновления через winget", 3*time.Minute, func() (string, string) {
+			if wingetPath() == "" {
+				return skipf("winget не установлен")
+			}
+			res, err := listUpgrades(&Job{cancel: make(chan struct{})})
+			if err != nil {
+				return warnf("%v", err)
+			}
+			return okf("доступно обновлений: %d", len(res.([]Upgrade)))
+		})
+	}
 	timed("Запущенные процессы", 2*time.Second, func() (string, string) {
 		n := len(winapi.Processes())
 		if n < 5 && winapi.IsWindows {
