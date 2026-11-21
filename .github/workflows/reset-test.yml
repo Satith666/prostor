@@ -40,23 +40,23 @@ jobs:
           # Резервные копии — как их пишет WinPulse (System.Text.Json, перечисления строками)
           $dir = Join-Path $env:LOCALAPPDATA 'WinPulse\backups'
           New-Item -ItemType Directory -Force $dir | Out-Null
-          function R($hive, $key, $name, $existed, $kind, $data, $sub = $null) {
+          function RegEntry($hive, $key, $name, $existed, $kind, $data, $sub = $null) {
             [ordered]@{ TargetId = ("reg:$hive\$key\$name" + $(if ($sub) { "#$sub" } else { '' })).ToLower(); ItemId = 'test'; SavedAt = (Get-Date).ToString('o'); Kind = 'registry'; Title = "test $name";
               Hive = $hive; Key = $key; ValueName = $name; SubKey = $sub; Existed = $existed; ValueKind = $kind; Data = $data }
           }
           $wg = [ordered]@{ Version = 1; Module = 'windowed-games'; Entries = @(
-            (R 'CurrentUser' 'Software\WinPulseTest' 'A' $true 'DWord' '1'),
-            (R 'CurrentUser' 'Software\WinPulseTest' 'B' $false 'DWord' $null),
-            (R 'CurrentUser' 'Software\WinPulseTest' 'S' $true 'String' '2' 'Y'),
-            (R 'CurrentUser' 'Software\WinPulseTest' 'S' $false 'String' $null 'Z'),
-            (R 'LocalMachine' 'SOFTWARE\WinPulseTest' 'M' $true 'DWord' '7'),
-            (R 'LocalMachine' 'SOFTWARE\WinPulseTest' 'N' $false 'DWord' $null),
-            (R 'LocalMachine' 'SOFTWARE\WinPulseTest' 'Multi' $true 'MultiString' "a`nb"),
+            (RegEntry 'CurrentUser' 'Software\WinPulseTest' 'A' $true 'DWord' '1'),
+            (RegEntry 'CurrentUser' 'Software\WinPulseTest' 'B' $false 'DWord' $null),
+            (RegEntry 'CurrentUser' 'Software\WinPulseTest' 'S' $true 'String' '2' 'Y'),
+            (RegEntry 'CurrentUser' 'Software\WinPulseTest' 'S' $false 'String' $null 'Z'),
+            (RegEntry 'LocalMachine' 'SOFTWARE\WinPulseTest' 'M' $true 'DWord' '7'),
+            (RegEntry 'LocalMachine' 'SOFTWARE\WinPulseTest' 'N' $false 'DWord' $null),
+            (RegEntry 'LocalMachine' 'SOFTWARE\WinPulseTest' 'Multi' $true 'MultiString' "a`nb"),
             [ordered]@{ TargetId = 'power:active'; ItemId = 'power'; Kind = 'power'; Title = 'power'; Existed = $true; SchemeGuid = $orig; SchemeName = 'Original'; CreatedSchemeGuid = $dup },
             [ordered]@{ TargetId = 'task:\winpulsetest\winpulsetesttask'; ItemId = 'startup'; Kind = 'task'; Title = 'task'; Existed = $true; TaskPath = '\WinPulseTest\WinPulseTestTask'; Data = '1' }
           ) }
           $st = [ordered]@{ Version = 1; Module = 'startup'; Entries = @(
-            (R 'CurrentUser' 'Software\WinPulseTest' 'Bin' $true 'Binary' ([Convert]::ToBase64String([byte[]](2,0,0,0,0,0,0,0,0,0,0,0))))
+            (RegEntry 'CurrentUser' 'Software\WinPulseTest' 'Bin' $true 'Binary' ([Convert]::ToBase64String([byte[]](2,0,0,0,0,0,0,0,0,0,0,0))))
           ) }
           $nv = [ordered]@{ Version = 1; Module = 'nvidia'; Entries = @(
             [ordered]@{ TargetId = 'nv:game.exe:10835002'; ItemId = 'nv-fpscap'; Kind = 'nvidia'; Title = 'fps cap'; Existed = $false; NvApp = 'game.exe'; NvAppName = 'Test Game'; NvSettingId = 277041154 }
