@@ -379,7 +379,12 @@ if ($machineMode) {
     if ($env:WP_RESULT) {
         try {
             $tmp = $env:WP_RESULT + '.tmp'
-            [IO.File]::WriteAllText($tmp, (ConvertTo-Json -InputObject @($results) -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
+            # Простые строки через табуляцию: ConvertTo-Json в PowerShell 5.1 падает на таких списках («Argument types do not match»).
+            $lines = foreach ($r in $results) {
+                (@($(if ($r.Ok) { '1' } else { '0' }), $r.TargetId, $r.Kind, $r.File, $r.Title, $r.Message) |
+                    ForEach-Object { ([string]$_) -replace "[`t`r`n]+", ' ' }) -join "`t"
+            }
+            [IO.File]::WriteAllLines($tmp, [string[]]@($lines), (New-Object System.Text.UTF8Encoding($false)))
             Move-Item -LiteralPath $tmp -Destination $env:WP_RESULT -Force
         } catch {
             Say "Не удалось записать итог помощника: $($_.Exception.Message)" 'Red'
@@ -470,7 +475,12 @@ if ($all.Count -eq 0) {
                 Start-Sleep -Milliseconds 500
             }
             if (Test-Path -LiteralPath $resultFile) {
-                $machineResults = @([IO.File]::ReadAllText($resultFile, [Text.Encoding]::UTF8) | ConvertFrom-Json)
+                $machineResults = @(foreach ($line in [IO.File]::ReadAllLines($resultFile, [Text.Encoding]::UTF8)) {
+                    if (-not $line) { continue }
+                    $p = $line.Split("`t")
+                    while ($p.Count -lt 6) { $p += '' }
+                    [pscustomobject]@{ Ok = ($p[0] -eq '1'); TargetId = $p[1]; Kind = $p[2]; File = $p[3]; Title = $p[4]; Message = $p[5] }
+                })
                 foreach ($r in $machineResults) {
                     $results.Add($r)
                     $line = if ($r.Ok) { "  [готово]  $($r.Title) ($($r.TargetId))" } else { "  [ошибка]  $($r.Title) ($($r.TargetId)) — $($r.Message)" }
