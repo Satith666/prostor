@@ -114,8 +114,8 @@ jobs:
           Check 'report on Desktop' ($null -ne $report)
           if ($report) {
             $text = [IO.File]::ReadAllText($report.FullName, [Text.Encoding]::UTF8)
-            Check 'report mentions NVIDIA manual reset' ($text -match 'Восстановить')
-            Check 'display API compiled' (-not ($text -match 'Не удалось подготовить работу с мониторами'))
+            Check 'report lists the NVIDIA game for manual reset' ($text -match 'Test Game \(game\.exe\)')
+            Check 'display API compiled (monitor modes listed)' ($text -match 'DISPLAY1')
             Write-Output '----- report -----'
             Write-Output $text
           }
