@@ -381,7 +381,11 @@ if ($machineMode) {
             $tmp = $env:WP_RESULT + '.tmp'
             [IO.File]::WriteAllText($tmp, (ConvertTo-Json -InputObject @($results) -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
             Move-Item -LiteralPath $tmp -Destination $env:WP_RESULT -Force
-        } catch { }
+        } catch {
+            Say "Не удалось записать итог помощника: $($_.Exception.Message)" 'Red'
+        }
+    } else {
+        Say 'WP_RESULT не задан' 'Red'
     }
     exit 0
 }
