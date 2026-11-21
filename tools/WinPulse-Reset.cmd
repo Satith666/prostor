@@ -378,7 +378,9 @@ if ($machineMode) {
     }
     if ($env:WP_RESULT) {
         try {
-            [IO.File]::WriteAllText($env:WP_RESULT, (ConvertTo-Json -InputObject @($results) -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
+            $tmp = $env:WP_RESULT + '.tmp'
+            [IO.File]::WriteAllText($tmp, (ConvertTo-Json -InputObject @($results) -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
+            Move-Item -LiteralPath $tmp -Destination $env:WP_RESULT -Force
         } catch { }
     }
     exit 0
@@ -453,7 +455,16 @@ if ($all.Count -eq 0) {
                 "try { & ([ScriptBlock]::Create([IO.File]::ReadAllText(`$env:WP_SELF, [Text.Encoding]::UTF8))) *>> $(Quote $helperLog) } " +
                 "catch { `$_ | Out-String | Out-File -Append -LiteralPath $(Quote $helperLog) }"
             $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($inner))
-            Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded" -Verb RunAs -Wait -WindowStyle Hidden
+            # Start-Process -Wait для процесса с правами администратора возвращается сразу — ждём сами:
+            # сначала сам процесс, потом файл с итогом (до 10 минут: пока человек отвечает на запрос UAC).
+            $helper = Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded" -Verb RunAs -WindowStyle Hidden -PassThru
+            Say '  Жду, пока помощник закончит…'
+            $deadline = (Get-Date).AddMinutes(10)
+            if ($helper) { try { [void]$helper.WaitForExit(600000) } catch { } }
+            while (-not (Test-Path -LiteralPath $resultFile) -and (Get-Date) -lt $deadline) {
+                if ($helper -and $helper.HasExited -and (Get-Date) -gt $helper.ExitTime.AddSeconds(5)) { break }
+                Start-Sleep -Milliseconds 500
+            }
             if (Test-Path -LiteralPath $resultFile) {
                 $machineResults = @([IO.File]::ReadAllText($resultFile, [Text.Encoding]::UTF8) | ConvertFrom-Json)
                 foreach ($r in $machineResults) {
@@ -462,6 +473,7 @@ if ($all.Count -eq 0) {
                     Say $line $(if ($r.Ok) { 'Green' } else { 'Red' })
                 }
                 Remove-Item -LiteralPath $resultFile -ErrorAction SilentlyContinue
+                Remove-Item -LiteralPath $helperLog -ErrorAction SilentlyContinue
                 if (@($machineResults | Where-Object { $_.TargetId -ne 'helper' }).Count -eq 0) {
                     Say '  Помощник не нашёл системных изменений для возврата.' 'Red'
                 }
