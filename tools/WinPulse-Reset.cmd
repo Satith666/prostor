@@ -447,8 +447,11 @@ if ($all.Count -eq 0) {
             # Помощник с правами администратора — тот же скрипт в режиме machine. Параметры передаём через
             # -EncodedCommand: так пути с пробелами, кавычками и кириллицей доходят без искажений.
             function Quote([string]$text) { "'" + $text.Replace("'", "''") + "'" }
+            $helperLog = Join-Path $backupDir "reset-helper-$stamp.log"
             $inner = "`$env:WP_MODE='machine'; `$env:WP_BACKUP=$(Quote $backupDir); `$env:WP_RESULT=$(Quote $resultFile); " +
-                "`$env:WP_SELF=$(Quote $env:WP_SELF); & ([ScriptBlock]::Create([IO.File]::ReadAllText(`$env:WP_SELF, [Text.Encoding]::UTF8)))"
+                "`$env:WP_SELF=$(Quote $env:WP_SELF); " +
+                "try { & ([ScriptBlock]::Create([IO.File]::ReadAllText(`$env:WP_SELF, [Text.Encoding]::UTF8))) *>> $(Quote $helperLog) } " +
+                "catch { `$_ | Out-String | Out-File -Append -LiteralPath $(Quote $helperLog) }"
             $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($inner))
             Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded" -Verb RunAs -Wait -WindowStyle Hidden
             if (Test-Path -LiteralPath $resultFile) {
@@ -464,6 +467,12 @@ if ($all.Count -eq 0) {
                 }
             } else {
                 Say '  Помощник с правами администратора не вернул результат.' 'Red'
+                if (Test-Path -LiteralPath $helperLog) {
+                    Say '  Журнал помощника:' 'Red'
+                    foreach ($l in [IO.File]::ReadAllLines($helperLog)) { Say "    $l" }
+                } else {
+                    Say '  Помощник не запустился (нет даже журнала).' 'Red'
+                }
                 foreach ($e in $machineEntries) { Add-Result '' $e $false 'помощник с правами администратора не сработал' }
             }
         } catch {
