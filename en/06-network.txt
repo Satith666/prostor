@@ -1,0 +1,43 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+56%
+Memory
+78%
+Disks
+14%
+Graphics
+92%
+Network
+1.4 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Speed per connection. Which apps download and upload will come in a later stage (needs Windows event tracing).
+Ethernet · Ethernet
+Realtek Gaming 2.5GbE Family Controller
+last 2 minutes
+DOWNLOAD
+1.1 Mbps
+UPLOAD
+303 Kbps
+link speed 2.5 Gbps

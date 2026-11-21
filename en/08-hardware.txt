@@ -1,0 +1,66 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+45%
+Memory
+78%
+Disks
+16%
+Graphics
+100%
+Network
+1.8 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Where the most frames are lost and what Windows can't fix by itself: the monitor cable, memory speed and channels, the GPU bus, games on an HDD. WinPulse changes nothing here — it finds the problem and explains step by step what to do.
+Hardware: 2 of 2 OK
+Windows Server 2025 Datacenter 24H2 · build 26100.33828 · GPU not detected · 1 monitor · Administrator
+Refresh
+1
+Monitor is plugged into the graphics card
+Not available
+not available on this system
+A common mistake after building or moving a PC: the monitor cable is in the motherboard's port, not the graphics card's. Then the game either runs on the CPU's integrated graphics or every frame is routed through it — far fewer FPS than the card can do.
+No discrete graphics card found — nothing to check.
+2
+RAM at its rated speed (XMP / EXPO)
+Memory kits ship with an XMP or EXPO profile (e.g. DDR4-3200), but motherboards boot them at base speed by default — often 2133–2666. In CPU-bound games slow memory costs FPS and especially 1% lows. Enabling the profile is a standard BIOS setting; it doesn't void the warranty.
+Windows didn't report the memory speed.
+3
+Memory in dual-channel mode
+2 sticks
+OK
+The CPU reads memory over two channels at once when there are two sticks in the right slots. With one stick (or two in the same channel) memory bandwidth halves — a noticeable FPS hit, especially for integrated graphics.
+4
+Enough RAM for games
+16.0 GB
+Modern games plus Windows, a browser and Discord take 10–14 GB. With less RAM, Windows pages data out to disk and the game hitches on every load. 16 GB is a comfortable minimum, 32 GB gives headroom.
+5
+Graphics card on the full PCIe link
+The graphics card talks to the CPU over PCI Express. In a lower slot, through a riser or with dirty contacts it gets fewer lanes (x4 instead of x16) — a noticeable FPS loss in some games. The link speed drops at idle to save power — that's normal, so only the lane count is checked.
+Windows didn't report the graphics card's bus parameters.
+6
+Games on an SSD
+Average FPS barely depends on the disk, but modern games constantly stream textures and levels while you play. From a hard drive (HDD) that's dozens of times slower than from an SSD — hence freezes, blurry textures and long loads.
+No Steam or Epic Games titles found.
+WinPulse doesn't disable Defender or Windows services, doesn't touch HPET, Win32PrioritySeparation or network settings, doesn't clean the registry and never sets games to Realtime priority — these 'tweaks' have no proven effect.

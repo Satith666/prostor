@@ -1,0 +1,99 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+45%
+Memory
+78%
+Disks
+21%
+Graphics
+100%
+Network
+152 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+2
+Tune-up
+Startup
+Drivers
+Driver latency
+On top — what affects games; below — Windows clean-up that does not affect FPS (and says so). Each setting shows its cost. WinPulse saves the old value before any change and restores it in one click. Power plan, Game Mode and GPU scheduling are in “Windowed games”.
+Tune-up: 5 of 10 OK
+Windows Server 2025 Datacenter 24H2 · build 26100.33828 · GPU not detected · 1 monitor · Administrator
+The backup is empty — WinPulse hasn't changed anything yet.
+Backup
+Fix all recommended
+Restore everything
+Refresh
+For games
+1
+Monitor runs at its full refresh rate
+Full rate: 64 Hz
+OK
+A common case: a 144 or 165 Hz monitor runs at 60 Hz after installing Windows or a driver. The game may render 200 frames, but you'll only see 60 a second. This is the most noticeable smoothness gain — check it first. If the high rate isn't offered at all, an old HDMI cable is a frequent cause: use DisplayPort at 1440p and above.
+HyperVMonitor
+1024×768: now 64 Hz, max 64 Hz
+Mouse without acceleration
+Acceleration is on
+can be improved
+Windows turns on “Enhance pointer precision” by default — it's actually acceleration: a fast flick moves the cursor further than a slow move over the same distance. That hurts aiming: muscle memory only works when the same hand motion always gives the same movement. Pro players turn it off. Games with raw input ignore it, but it still affects menus, launchers and older games.
+The cursor speeds up on fast moves, making aim unpredictable. Takes effect after you sign out and back in.
+Turn acceleration off
+3
+“Sticky Keys” pop-up in the middle of a game
+Shortcuts are on
+Press Shift five times (or hold right Shift) and Windows minimizes the game to ask about Sticky Keys. In shooters where Shift is sprint or crouch it happens at the worst moment. This only disables the shortcut; the accessibility features stay in Settings and can be turned on at any time.
+The pop-up can appear when Shift is pressed often: StickyKeys, FilterKeys, ToggleKeys. Takes effect after you sign out and back in.
+Turn the shortcuts off
+4
+Core isolation: Memory integrity (HVCI)
+Off
+Protection that keeps malicious code out of the Windows kernel. The cost is up to 5–10% FPS in some games, especially on CPUs older than 2018. Microsoft itself lists turning it off as a way to improve gaming performance. It's a trade-off between speed and security.
+Without it the PC is more exposed to malicious drivers. Some anti-cheats (e.g. Valorant, FACEIT on Windows 11) may require it — if a game stops launching, restore it.
+Turn protection on
+needs admin rights
+restart required
+5
+Page file
+Set manually
+When RAM runs out, Windows temporarily moves rarely used data to disk. Without a page file, apps and games crash at that moment. Disabling it doesn't make anything faster — that's a myth. The best option for everyone is “Automatically manage size”.
+If you get out-of-memory errors, switch to automatic size.
+Make automatic
+Windows without clutter — doesn't affect FPS
+6
+Fast startup
+On “Shut down”, Windows saves the kernel and drivers to disk to boot faster next time. The cost: drivers aren't restarted, updates sometimes don't finish, and dual-boot setups risk disk corruption. If you see odd glitches after power-on, turn it off. “Restart” always does a full restart either way.
+Turn fast startup on
+7
+Transparency effects
+On
+Translucent Start, taskbar and windows. On integrated graphics they slightly load the GPU and battery; on a discrete GPU there's no difference.
+Visible immediately or after signing in again.
+Turn transparency off
+8
+Automatic install of “suggested” apps
+Windows downloads “suggested” games and apps in the background and pins them to Start. This stops it; what's installed stays and can be uninstalled as usual.
+Turn off
+9
+Windows tips, suggestions and nags
+Pop-up “tips”, suggestions in Start and Settings, and “Let's finish setting up your device” reminders. Little value, distracting.
+10
+Web results in Start search
+Start search sends every query to Bing and shows web results. Without it, searching apps and files is faster and stays offline. Takes effect after restarting Explorer or signing in again.
+WinPulse doesn't disable Defender or Windows services, doesn't touch HPET, Win32PrioritySeparation or network settings, doesn't clean the registry and never sets games to Realtime priority — these 'tweaks' have no proven effect.

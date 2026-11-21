@@ -1,0 +1,127 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+61%
+Memory
+78%
+Disks
+14%
+Graphics
+100%
+Network
+1.4 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Used memory is not a problem by itself. The problem is when Windows starts paging data from disk.
+BREAKDOWN
+12.4 GB of 16.0 GB
+Programs
+9.5 GB
+System and drivers
+2.1 GB
+Compressed
+575 MB
+Modified
+218 MB
+Cache
+2.7 GB
+Free
+789 MB
+IN USE, LAST 10 MINUTES, %
+Available
+3.5 GB
+Committed / limit
+16.6 GB / 23.9 GB
+Paging from disk
+36 pages/s
+Kernel paged pool
+640 MB
+Kernel non-paged pool
+310 MB
+Hardware reserved
+140 MB
+Enough memory
+12.4 GB of 16.0 GB in use, plus 2.7 GB of cache that Windows gives back on demand.
+What uses memory
+Private memory of processes. The 'growing' label means it has been rising for the last hour — looks like a leak.
+APP
+CPU
+MEMORY
+DISK
+GPU
+Cyberpunk 2077
+39.4%
+5.5 GB
+3.4 MB/s
+82%
+Google Chrome
+7.3%
+1.2 GB
+0 MB/s
+3%
+Microsoft Teams
+2.4%
+948 MB
+1%
+Discord
+1.1%
+490 MB
+Memory Compression
+0.2%
+460 MB
+—
+Wallpaper Engine
+3.3%
+230 MB
+Microsoft Defender Antivirus
+0.4%
+210 MB
+Steam (web helper)
+0.6%
+File Explorer
+150 MB
+Steam
+Desktop Window Manager
+1.9%
+4%
+95 MB
+SysMain
+70 MB
+Windows Registry
+0.1%
+55 MB
+Microsoft OneDrive
+Search Indexer
+45 MB
+155 KB/s
+Windows Update
+38 MB
+Connected Devices Platform Service
+0.0%
+14 MB
+Windows Audio
+0.3%
+12 MB
+Local Security Authority (LSASS)
+9.0 MB
+Show all (27)

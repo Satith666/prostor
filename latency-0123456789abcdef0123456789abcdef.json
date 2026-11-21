@@ -1,0 +1,193 @@
+{
+  "Taken": "2026-11-21T11:24:26.1866009+00:00",
+  "Seconds": 5.2394405,
+  "Processors": 4,
+  "DpcCount": 10108,
+  "IsrCount": 5016,
+  "MaxDpcUs": 231.5,
+  "MaxIsrUs": 10.7,
+  "TotalUs": 52551.300000001065,
+  "EventsLost": 0,
+  "ModulesKnown": 259,
+  "ModuleSource": "ntquery",
+  "Histogram": [
+    12671,
+    2443,
+    8,
+    2,
+    0,
+    0,
+    0,
+    0
+  ],
+  "Drivers": [
+    {
+      "Name": "stornvme.sys",
+      "DpcCount": 4982,
+      "IsrCount": 0,
+      "MaxDpcUs": 231.5,
+      "MaxIsrUs": 0,
+      "TotalUs": 4461.199999999865,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 231.5
+    },
+    {
+      "Name": "NDIS.SYS",
+      "DpcCount": 1,
+      "IsrCount": 0,
+      "MaxDpcUs": 163.9,
+      "MaxIsrUs": 0,
+      "TotalUs": 163.9,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 163.9
+    },
+    {
+      "Name": "sacdrv.sys",
+      "DpcCount": 5,
+      "IsrCount": 0,
+      "MaxDpcUs": 94.4,
+      "MaxIsrUs": 0,
+      "TotalUs": 362,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 94.4
+    },
+    {
+      "Name": "mana_bus.sys",
+      "DpcCount": 28,
+      "IsrCount": 28,
+      "MaxDpcUs": 77.3,
+      "MaxIsrUs": 4,
+      "TotalUs": 668.8999999999999,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 77.3
+    },
+    {
+      "Name": "vmbus.sys",
+      "DpcCount": 5,
+      "IsrCount": 5,
+      "MaxDpcUs": 68.9,
+      "MaxIsrUs": 2.3,
+      "TotalUs": 146.3,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 68.9
+    },
+    {
+      "Name": "dxgkrnl.sys",
+      "DpcCount": 38,
+      "IsrCount": 0,
+      "MaxDpcUs": 41.5,
+      "MaxIsrUs": 0,
+      "TotalUs": 456.59999999999985,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 41.5
+    },
+    {
+      "Name": "storport.sys",
+      "DpcCount": 4985,
+      "IsrCount": 4983,
+      "MaxDpcUs": 40.6,
+      "MaxIsrUs": 10.7,
+      "TotalUs": 45759.60000000026,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 40.6
+    },
+    {
+      "Name": "tcpip.sys",
+      "DpcCount": 14,
+      "IsrCount": 0,
+      "MaxDpcUs": 29.6,
+      "MaxIsrUs": 0,
+      "TotalUs": 142.6,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 29.6
+    },
+    {
+      "Name": "ntoskrnl.exe",
+      "DpcCount": 25,
+      "IsrCount": 0,
+      "MaxDpcUs": 23.6,
+      "MaxIsrUs": 0,
+      "TotalUs": 283.8,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 23.6
+    },
+    {
+      "Name": "Ntfs.sys",
+      "DpcCount": 1,
+      "IsrCount": 0,
+      "MaxDpcUs": 12,
+      "MaxIsrUs": 0,
+      "TotalUs": 12,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 12
+    },
+    {
+      "Name": "symcryptk.dll",
+      "DpcCount": 15,
+      "IsrCount": 0,
+      "MaxDpcUs": 6.1,
+      "MaxIsrUs": 0,
+      "TotalUs": 63.9,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 6.1
+    },
+    {
+      "Name": "afd.sys",
+      "DpcCount": 4,
+      "IsrCount": 0,
+      "MaxDpcUs": 6,
+      "MaxIsrUs": 0,
+      "TotalUs": 21.799999999999997,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 6
+    },
+    {
+      "Name": "storvsp.sys",
+      "DpcCount": 1,
+      "IsrCount": 0,
+      "MaxDpcUs": 3.6,
+      "MaxIsrUs": 0,
+      "TotalUs": 3.6,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 3.6
+    },
+    {
+      "Name": "CLASSPNP.SYS",
+      "DpcCount": 4,
+      "IsrCount": 0,
+      "MaxDpcUs": 2,
+      "MaxIsrUs": 0,
+      "TotalUs": 5.1,
+      "Over500": 0,
+      "Over1000": 0,
+      "MaxUs": 2
+    }
+  ],
+  "Error": null,
+  "Debug": "image events 0, first: -; routines: FFFFF802264884C0 FFFFF802286F6690 FFFFF8022796B5E0; modules: 259, kd.dll@FFFFF80223A10000 .. hal.dll@FFFFF80293800000",
+  "MaxUs": 231.5,
+  "Worst": {
+    "Name": "stornvme.sys",
+    "DpcCount": 4982,
+    "IsrCount": 0,
+    "MaxDpcUs": 231.5,
+    "MaxIsrUs": 0,
+    "TotalUs": 4461.199999999865,
+    "Over500": 0,
+    "Over1000": 0,
+    "MaxUs": 231.5
+  }
+}

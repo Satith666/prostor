@@ -1,0 +1,62 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+69%
+Memory
+78%
+Disks
+51%
+Graphics
+92%
+Network
+1.2 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+2
+Tune-up
+Startup
+Drivers
+Driver latency
+Programs that start with Windows: from the registry, Startup folders and Task Scheduler. Disabling works like in Task Manager — the entry stays, and you can turn it back on any time.
+Start with Windows: 5 · disabled: 2
+WinPulse hasn't changed anything in startup yet.
+Nothing to disable
+Revert everything
+Refresh
+Task Manager
+AzureArcSetup
+Unknown program. Check the publisher and file path. Disabling is reversible — one click brings it back.
+Your call
+Enabled
+not running now
+Disable
+Folder
+administrator rights required
+Google Updater (x86)
+Updates Google software. If disabled, the browser updates itself when it starts.
+primer
+ServiceFabricLocalClusterManager
+Windows Security notification icon
+The Windows Security tray icon. It neither speeds up nor slows down protection — keep it.
+Better keep
+Keeps your Microsoft software up to date. If this task is disabled or stopped, your Microsoft software will not be kept up to date, meaning security vulnerabilities that may arise cannot be fixed and features may not work. This task uninstalls itself when there is no Microsoft software using it.
+Disabled
+Enable
+Program update check. If disabled, you'll have to install updates yourself.
+Windows services and system tasks are not shown or changed here. Programs that re-add themselves to startup on every launch are best turned off in their own settings.

@@ -1,0 +1,62 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+49%
+Memory
+77%
+Disks
+16%
+Graphics
+100%
+Network
+1.9 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Game profile settings in the driver — the same as Manage 3D Settings in the NVIDIA Control Panel, but explained and reversible. They change only for the selected game (shader cache is global). Before writing, WinPulse checks the setting code against its name in the driver.
+Game
+Path to the game exe, e.g. D:\Games\Game\game.exe
+Browse…
+From running…
+NVIDIA driver: 0 of 0 OK
+Windows Server 2025 Datacenter 24H2 · build 26100.33828 · GPU not detected · 1 monitor · Administrator
+The backup is empty — WinPulse hasn't changed anything yet.
+Backup
+Fix all recommended
+Restore everything
+Refresh
+1
+GPU power in the game: prefer maximum performance
+Not available
+not available on this system
+By default the driver drops GPU clocks as soon as a scene gets light and raises them with a delay — when the load spikes, that shows up as frame-time hitches. “Prefer maximum performance” keeps clocks high, but only while this game runs: on the desktop the card still saves power.
+Not an NVIDIA GPU — these settings are for the NVIDIA driver only.
+2
+Low latency mode
+The CPU can prepare frames ahead and queue them for the GPU — that adds delay between mouse movement and the picture. Low latency mode “On” limits the queue to one frame. It helps most when the game is GPU-bound. If the game has NVIDIA Reflex, enable it in-game: it works better and overrides this setting. Cost: in CPU-bound games FPS may drop by a couple of frames.
+3
+Frame cap 3 below the monitor's refresh rate
+With G-SYNC or FreeSync the monitor follows the game — but only while FPS stays below its refresh rate. Once FPS hits the ceiling, regular VSync kicks in with its latency (or tearing). Capping 3 frames below the refresh rate keeps the game inside the VRR range: smooth picture, minimal latency. The driver applies it to this game only.
+4
+Shader cache of at least 10 GB
+Games compile shaders the first time they meet an effect — hence stutters “in new places”. The driver saves compiled shaders to disk, but the default space is limited, and in big games old shaders get evicted — compilation and stutters repeat. 10 GB fits several big games. The setting is global for all games.
+WinPulse doesn't disable Defender or Windows services, doesn't touch HPET, Win32PrioritySeparation or network settings, doesn't clean the registry and never sets games to Realtime priority — these 'tweaks' have no proven effect.

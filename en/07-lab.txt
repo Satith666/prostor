@@ -1,0 +1,77 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+49%
+Memory
+78%
+Disks
+17%
+Graphics
+94%
+Network
+1.3 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Measure FPS and 1% lows in any game and see what it's bound by. While you play, WinPulse records the session on its own and later shows what got in the game's way and when.
+Game mode
+Off. Turn it on and while you play WinPulse raises the power plan, pauses wallpapers and moves background apps out of the way. Everything is restored afterwards.
+Max-performance power plan
+Pause Wallpaper Engine
+High priority for the game
+Background apps lower
+Game mode: OFF
+FPS measurement
+GAME
+Cyberpunk 2077
+Cyberpunk2077.exe
+GPU 72%
+DURATION
+30 s
+1 min
+2 min
+5 min
+Start measuring
+Captures folder
+PresentMon: PresentMon-2.6.0-x64.exe. Without admin rights Windows asks permission for each capture.
+—
+Pick a game and press Start measuring. You'll get average FPS, 1% lows and what the game is bound by: GPU, CPU or a frame cap.
+Game sessions
+No game running. Recording starts automatically when you launch a game.
+Background apps took resources
+CPU averaged 58%, GPU 98%, RAM up to 82% · 75 FPS on average
+FPS (while measuring)
+The game was GPU-bound
+The GPU averaged 98% load. Upscaling (DLSS, FSR, XeSS) or lighter graphics settings will add FPS; background apps barely matter here.
+Together about 6% CPU and 15% GPU. Top: Wallpaper Engine, Discord, Google Chrome.
+The GPU ran hot
+Temperature reached 89 °C, and at hot moments the clock dropped by 6% — a direct FPS loss. Clean dust from the heatsink and fans, check case airflow. A more aggressive fan curve (MSI Afterburner) keeps clocks steadier.
+WHAT TOOK RESOURCES FROM THE GAME (SESSION AVERAGE)
+Wallpaper Engine
+In Wallpaper Engine → Performance, set “Pause” when another app is maximized.
+Discord
+Turn off Discord's overlay and hardware acceleration if you don't need them.
+Google Chrome
+Close tabs with video and streams, or the whole browser while playing.
+NOTABLE MOMENTS
+25:10
+“Windows Modules Installer” loaded the CPU up to 30% for 1 min 10 s. FPS dropped to 42 (usually 76).

@@ -1,0 +1,109 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+64%
+Memory
+78%
+Disks
+21%
+Graphics
+97%
+Network
+152 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Windowed & borderless games
+13 checks for smooth windowed gaming. Before any change WinPulse saves the old value and shows exactly what changes.
+Game
+Path to the game exe, e.g. D:\Games\Game\game.exe
+Browse…
+From running…
+Windowed gaming: 4 of 7 set up
+Windows Server 2025 Datacenter 24H2 · build 26100.33828 · GPU not detected · 1 monitor · Administrator
+The backup is empty — WinPulse hasn't changed anything yet.
+Backup
+Fix all recommended
+Restore everything
+Refresh
+1
+Optimizations for windowed games
+Off
+can be improved
+Windows 11 moves DirectX 10/11 games running windowed or borderless to the modern flip presentation model. Latency drops to fullscreen levels, and VRR and Auto HDR start working in a window.
+Restart the game after enabling.
+Fix
+2
+Variable refresh rate for games
+Not available
+not available on this system
+Lets Windows use G-SYNC/FreeSync for DirectX 11 games that don't support it natively. Works only when the monitor and driver support variable refresh rate.
+Your monitors don't report variable refresh rate support (G-SYNC/FreeSync/Adaptive-Sync), so there is nothing to enable.
+3
+G-SYNC / FreeSync in windowed mode
+For VRR to work in borderless windows it must be enabled in the driver panel for both fullscreen and windowed mode. This can't be done safely without editing driver profiles, so here is a step-by-step guide.
+Your monitors don't report G-SYNC/FreeSync/Adaptive-Sync support.
+4
+“Disable fullscreen optimizations” checkbox
+This checkbox in the exe properties (Compatibility tab) stops Windows from using modern presentation for the game. In borderless mode it adds latency and can break VRR. The flag should be removed.
+Pick a game at the top of the page first — this item is set per game executable.
+5
+Run the game on the high-performance GPU
+Tells Windows to run the game on the powerful GPU (“High performance” in Graphics settings). Matters for laptops and PCs with integrated graphics.
+6
+Hardware-accelerated GPU scheduling (HAGS)
+The GPU manages its own work queue instead of Windows. Required for DLSS Frame Generation; barely affects regular FPS (0–2%), sometimes slightly lowers latency. Needs admin rights and a restart.
+Don't turn HAGS off if you use DLSS Frame Generation — it doesn't work without it.
+Turn HAGS on
+needs admin rights
+restart required
+7
+Windows Game Mode
+On (default)
+OK
+While you play, Windows holds off driver updates and restart notifications and prioritizes the game. On by default.
+8
+Background game recording (Game DVR)
+On
+“Record what happened” constantly encodes gameplay video in the background and takes GPU resources. If you don't use it, turn it off. Screenshots and manual recording (Win+Alt+R) keep working.
+9
+Programs using the GPU in the background
+None found
+Live wallpapers, browser video, Discord/NVIDIA/Xbox overlays and RivaTuner draw over or next to the game and cost frames. Below is what is running now and how to tune it. Nothing is closed without your consent.
+10
+Monitors with different refresh rates
+With monitors like 165 Hz and 60 Hz side by side, a windowed game on Windows 10 can sync to the slower one and stutter. Raising the second monitor to its maximum refresh rate helps; to test, temporarily turn it off. Windows 11 is less affected.
+Only one monitor is connected — nothing to do.
+11
+Cap FPS 3 below the refresh rate
+With G-SYNC/FreeSync, frames must stay inside the VRR range. When FPS hits the refresh rate, regular V-Sync kicks in or tearing appears, and latency grows. A cap slightly below the refresh rate keeps the game inside the range.
+Without G-SYNC/FreeSync this cap isn't needed — your monitors don't report VRR support.
+12
+Power plan
+High performance
+The Power saver plan lowers CPU and GPU clocks, so games lose frames. High performance is better for gaming. The previous plan is saved and restored with one click.
+13
+Disable MPO (flicker and black flashes)
+Multi-Plane Overlay makes presenting frames cheaper, but on some systems (often NVIDIA with several monitors) it causes flicker, black flashes and stutter in windowed mode. Only disable it if you see these problems. Requires a restart. On recent Windows 11 builds the setting may have no effect.
+Only change this if you see flicker or black flashes.
+Disable MPO
+WinPulse doesn't disable Defender or Windows services, doesn't touch HPET, Win32PrioritySeparation or network settings, doesn't clean the registry and never sets games to Realtime priority — these 'tweaks' have no proven effect.

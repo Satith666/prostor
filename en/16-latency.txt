@@ -1,0 +1,114 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+61%
+Memory
+78%
+Disks
+16%
+Graphics
+100%
+Network
+1.7 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+2
+Tune-up
+Startup
+Drivers
+Driver latency
+Driver latency (DPC/ISR)
+If FPS is high but audio crackles, the mouse hitches or you get micro-stutter, a driver that holds the CPU too long in interrupts (ISR) and deferred procedure calls (DPC) is often to blame. WinPulse measures this the way LatencyMon does and shows which driver it is and what to do.
+Measurement
+The measurement reads Windows kernel events (ETW) and changes nothing.
+DURATION
+10 s
+30 s
+1 min
+Start measuring
+LatencyMon
+LAST MEASUREMENT
+There are long delays — this can cause audio crackles, mouse hitches and micro-stutter despite good FPS. Worst: Netwtw10.sys (2.76 ms).
+2.76 ms
+longest DPC
+41 µs
+longest ISR
+1,150
+events per second
+0.7%
+of one core
+28,850
+≤ 10 µs
+5,653
+≤ 50 µs
+3
+≤ 100 µs
+≤ 250 µs
+0
+≤ 500 µs
+≤ 1 ms
+1
+≤ 2 ms
+> 2 ms
+30 s measurement at 11:23.
+Sorted by the longest routine. The bar goes to 2 ms; yellow from 0.5 ms, red from 2 ms.
+Netwtw10.sys
+DPC: 1,301, max 2.76 ms · over 1 ms: 1 times
+Wi-Fi driver — one of the most common causes of spikes. Update it from the vendor; if you play on a cable, you can disable Wi-Fi.
+nvlddmkm.sys
+1.24 ms
+DPC: 5,201, max 1.24 ms · ISR: 5,101, max 41 µs · over 1 ms: 1 times
+NVIDIA graphics driver. Spikes are often fixed by a clean driver install (without extras) or rolling back a version.
+ntoskrnl.exe
+182 µs
+DPC: 9,001, max 182 µs
+Windows kernel (timers, scheduler). Usually a symptom, not the cause; check the power plan and CPU power saving.
+storport.sys
+120 µs
+DPC: 1,701, max 120 µs · ISR: 1,701, max 22 µs
+Storage controller. Update the chipset driver; Intel RST sometimes performs worse than the built-in Windows driver.
+ndis.sys
+96 µs
+DPC: 2,101, max 96 µs
+Windows network stack, driven by the network adapter driver. Update it; on Wi-Fi try a cable or disable adapter power saving.
+HDAudBus.sys
+74 µs
+DPC: 601, max 74 µs
+Audio driver. Update it from the motherboard vendor; audio 'enhancers' (Nahimic, Sonic Studio) are better turned off.
+USBXHCI.SYS
+61 µs
+DPC: 3,901, max 61 µs · ISR: 3,901, max 18 µs
+USB. High-polling mice and keyboards and cheap hubs add load — try another (rear) port or 1000 Hz polling instead of 4000–8000.
+Interrupt mode (MSI)
+MSI means message-signaled interrupts; modern devices usually have them enabled by the driver. NVIDIA GPUs often use line-based IRQs; enthusiasts switch them to MSI by hand, but there's no proven FPS gain and a mistake can stop Windows from booting. So WinPulse only shows the mode and changes nothing.
+NVIDIA GeForce RTX 3050
+line-based IRQ
+Audio
+NVIDIA High Definition Audio
+MSI
+Realtek High Definition Audio
+Intel(R) Wi-Fi 6 AX200 160MHz
+MSI · up to 16 msgs
+Realtek PCIe GbE Family Controller
+MSI · up to 1 msgs
+Storage
+Standard NVM Express Controller
+USB
+Intel(R) USB 3.1 eXtensible Host Controller
+MSI · up to 8 msgs

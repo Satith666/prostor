@@ -1,0 +1,40 @@
+11:21:57.318 startup
+11:21:57.578 before show
+11:21:57.844 shown
+11:21:57.846 started
+11:21:57.849 tour begin
+11:21:57.849 window 1044x788, content 1320x900
+11:21:57.849 first layout
+11:22:07.853 warmed up
+11:22:07.853 page overview
+11:22:10.959 saved overview
+11:22:11.872 page cpu
+11:22:14.999 saved cpu
+11:22:15.498 page memory
+11:22:18.614 saved memory
+11:22:19.092 page disk
+11:22:22.219 saved disk
+11:22:23.127 page gpu
+11:22:26.246 saved gpu
+11:22:26.699 page network
+11:22:29.765 saved network
+11:22:30.214 page lab
+11:22:33.354 saved lab
+11:22:33.822 page hardware
+11:22:41.925 saved hardware
+11:22:42.380 page nvidia
+11:22:50.451 saved nvidia
+11:22:50.908 page upscale
+11:22:58.995 saved upscale
+11:22:59.453 page windowed
+11:23:07.544 saved windowed
+11:23:08.916 page problems
+11:23:16.985 saved problems
+11:23:17.435 page optimize
+11:23:25.519 saved optimize
+11:23:26.420 page startup
+11:23:34.517 saved startup
+11:23:34.980 page drivers
+11:23:43.040 saved drivers
+11:23:43.490 page latency
+11:23:46.612 saved latency

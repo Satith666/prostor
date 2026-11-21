@@ -1,0 +1,65 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+53%
+Memory
+78%
+Disks
+21%
+Graphics
+100%
+Network
+153 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+2
+Tune-up
+Startup
+Drivers
+Driver latency
+Windows logs for 30 days, devices and disks — what happened, what it means and what to do. Nothing is changed: WinPulse only reads.
+Worth a look: 2 · FYI: 2
+Checked 21.11.2026 11:23 · logs for 30 days
+Check again
+Save report
+Reliability Monitor
+TIMELINE, 30 DAYS
+critical
+errors
+warnings
+Critical events: 0 · errors: 3 · warnings: 2
+Disk “Microsoft NVMe Direct Disk v2”: temperature 72 °C
+temperature 72 °C.
+WHAT TO DO
+1. Back up important files.
+2. Look at the detailed SMART data with the disk maker's tool or CrystalDiskInfo.
+3. Overheating: check airflow over the disk; a heatsink helps NVMe drives.
+ENTRIES
+Microsoft NVMe Direct Disk v2 · 220 GB, wear 0%, 72 °C
+Devices with errors: 1
+These devices have a yellow mark in Device Manager — they don't work or don't work properly.
+1. Install or reinstall the driver from the device maker's site (for a laptop, from the laptop maker's site).
+2. In Device Manager: right-click the device → Properties shows the exact error.
+VMBUS\{c376c1c3-d276-48d2-90a9-c04748072c60}\{c4e5e7d1-d748-4afc-979d-683167910a55} — drivers are not installed (code 28)
+Open Device Manager
+Services failed to start: 2 times
+Some services couldn't start or respond in time. Often these belong to removed programs or drivers — then it's harmless.
+Services crashed: 3 times
+A service stopped unexpectedly (Windows usually restarts it). Most often: «OpenSSH SSH Server» (3 times).
+Show passed checks (12)

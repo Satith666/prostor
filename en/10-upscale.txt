@@ -1,0 +1,64 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+64%
+Memory
+78%
+Disks
+21%
+Graphics
+93%
+Network
+153 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Upscaling: DLSS, FSR, XeSS
+DLSS, FSR and XeSS render at a lower resolution and reconstruct the full image — in GPU-bound games that's the biggest FPS gain of any setting. Here you can see what each of your games supports, which version, and what you can do. WinPulse doesn't swap libraries: DLSS Swapper and OptiScaler do that — and only in single-player games.
+GPU: NVIDIA GeForce RTX 3050. DLSS is available; DLSS Frame Generation isn't (RTX 40/50 only) — FSR 3 via OptiScaler replaces it.
+Games: 4, with upscalers: 3.
+Scan games
+DLSS Swapper
+OptiScaler
+Cyberpunk 2077
+D:\SteamLibrary\steamapps\common\Cyberpunk 2077
+Open folder
+DLSS 3.5.10
+DLSS Frame Generation 3.5.10
+DLSS Ray Reconstruction 3.5.10
+XeSS 1.3.0
+FSR 3+ 1.1.2
+Enable DLSS in the game's settings. If the game is GPU-bound, Quality mode usually adds noticeable FPS with almost no loss of sharpness.
+DLSS 3.5.10 is outdated. Newer versions are noticeably sharper in Balanced and Performance modes, so you can pick a faster mode. Update via NVIDIA App → Graphics → DLSS override (if supported) or DLSS Swapper.
+DLSS Frame Generation only works on RTX 40 and 50 — it won't show up on RTX 3050. Instead, OptiScaler can enable FSR 3 frame generation: noticeably smoother, slightly higher latency. Single-player only.
+Elden Ring
+D:\SteamLibrary\steamapps\common\ELDEN RING
+Online game with anti-cheat (Easy Anti-Cheat): don't swap libraries — you risk a ban. Use only what the game's settings offer.
+No DLSS, FSR or XeSS libraries found. If the game has built-in scaling (FSR 1, render scale), that adds FPS too.
+Starfield
+C:\Program Files (x86)\Steam\steamapps\common\Starfield
+FSR 2
+XeSS 1.2.0
+The game has no DLSS, only FSR and XeSS. OptiScaler can substitute DLSS — usually a cleaner image on RTX. Single-player only.
+Fortnite
+C:\Program Files\Epic Games\Fortnite
+DLSS 3.7.10

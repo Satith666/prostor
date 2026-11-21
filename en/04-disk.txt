@@ -1,0 +1,117 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+61%
+Memory
+78%
+Disks
+17%
+Graphics
+100%
+Network
+1.1 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+Response time is what matters. 100% active with fast responses is normal work.
+C: · Samsung SSD 980 PRO 1TB
+NVMe SSD
+2%
+ACTIVITY, LAST 10 MINUTES, %
+READ AND WRITE, LAST 2 MINUTES
+Response time
+0.3 ms
+Read
+0 B/s
+Write
+136 KB/s
+Queue
+0
+C: System
+310 GB free of 1000 GB
+D: · ST2000DM008-2FR102
+Hard disk (HDD) · SATA
+8.9 ms
+4.8 MB/s
+50 KB/s
+D: Games
+640 GB free of 2.0 TB
+Disks are coping
+No queues or slow responses.
+Who reads and writes
+APP
+CPU
+MEMORY
+DISK
+GPU
+Cyberpunk 2077
+40.0%
+5.5 GB
+4.9 MB/s
+Search Indexer
+0.2%
+45 MB
+—
+Microsoft Defender Antivirus
+0.4%
+210 MB
+0 MB/s
+Windows kernel (System)
+0.9%
+205 KB
+Windows Registry
+0.1%
+55 MB
+Session Manager
+1.0 MB
+Memory Compression
+460 MB
+Client Server Runtime
+2.0 MB
+Windows Start-Up
+Service Control Manager
+6.0 MB
+Local Security Authority (LSASS)
+9.0 MB
+Windows Update
+38 MB
+DNS Client
+0.0%
+Windows Audio
+0.3%
+12 MB
+Background Intelligent Transfer Service
+7.0 MB
+SysMain
+70 MB
+Connected Devices Platform Service
+14 MB
+Desktop Window Manager
+1.9%
+140 MB
+3%
+File Explorer
+150 MB
+Google Chrome
+6.8%
+1.2 GB
+Show all (27)

@@ -1,0 +1,109 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+58%
+Memory
+78%
+Disks
+16%
+Graphics
+95%
+Network
+1.2 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+Tune-up
+Startup
+Drivers
+Driver latency
+The same counters as Task Manager: load of the busiest GPU engine and video memory.
+Sensors: 71 °C (hotspot 83 °C) · 118 W · 1842 MHz · fans 50%
+NVIDIA GeForce RTX 3050
+VIDEO MEMORY
+6.8 GB of 8.0 GB
+GPU ENGINES
+3D
+Video decode
+4%
+Copy
+2%
+Video encode
+0%
+GPU is fully loaded
+NVIDIA GeForce RTX 3050: 99%. If a game is running, that's normal: it's GPU-bound.
+What loads the GPU
+APP
+CPU
+MEMORY
+DISK
+GPU
+Cyberpunk 2077
+38.0%
+5.5 GB
+4.4 MB/s
+74%
+Wallpaper Engine
+3.5%
+230 MB
+0 MB/s
+13%
+Google Chrome
+6.0%
+1.2 GB
+3%
+Discord
+0.9%
+490 MB
+Desktop Window Manager
+1.8%
+140 MB
+Microsoft Teams
+950 MB
+—
+Windows kernel (System)
+205 KB
+Windows Registry
+0.1%
+55 MB
+Session Manager
+1.0 MB
+Memory Compression
+0.2%
+460 MB
+Client Server Runtime
+2.0 MB
+Windows Start-Up
+Service Control Manager
+6.0 MB
+Local Security Authority (LSASS)
+9.0 MB
+Windows Update
+0.0%
+38 MB
+DNS Client
+Windows Audio
+0.3%
+12 MB
+Background Intelligent Transfer Service
+7.0 MB
+SysMain
+70 MB
+Connected Devices Platform Service
+14 MB
+Show all (27)

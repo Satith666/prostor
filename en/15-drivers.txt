@@ -1,0 +1,56 @@
+WinPulse
+gaming PC cockpit
+DEMO DATA
+Pro mode
+Language
+RU
+EN
+Administrator
+WinPulse 0.9.1-dev.49
+Log
+MONITORING
+Dashboard
+Processor
+60%
+Memory
+78%
+Disks
+15%
+Graphics
+100%
+Network
+1.2 Mbps
+GAMES
+FPS lab
+Hardware & FPS
+NVIDIA driver
+Upscaling
+Windowed games
+SYSTEM
+Problems
+2
+Tune-up
+Startup
+Drivers
+Driver latency
+Versions and dates of drivers for key devices. Links go only to official vendor sites and Windows Update. WinPulse itself never downloads or installs drivers.
+Drivers checked: 7 · need attention: 1
+The driver's age is checked. Comparison with the vendor's latest version will come later.
+Windows optional updates
+Refresh
+Device Manager
+Microsoft Hyper-V Video
+The graphics driver is over a year old. New games often need a fresh driver — check for an update on the maker's website.
+10.0.26100.1150
+Windows updates
+Microsoft Azure Network Adapter
+Built-in Windows driver — updated through Windows Update.
+2.0.18.52
+Disks and controllers
+ASAP NVM Express Controller
+6.70.2.29
+Microsoft Hyper-V SCSI Controller
+10.0.26100.7309
+Microsoft Storage Spaces Controller
+10.0.26100.33822
+Standard NVM Express Controller
