@@ -372,8 +372,14 @@ if ($machineMode) {
     Stop-WinPulseTraces
     $backups = Read-Backups
     Restore-Entries $backups $true
+    if (-not (Test-Path -LiteralPath $backupDir)) {
+        $results.Add([pscustomobject]@{ File = ''; TargetId = 'helper'; Kind = 'helper'; Title = 'Помощник администратора'; Ok = $false
+            Message = "не найдена папка резервных копий: $backupDir" })
+    }
     if ($env:WP_RESULT) {
-        try { $results | ConvertTo-Json -Depth 4 | Out-File -LiteralPath $env:WP_RESULT -Encoding UTF8 } catch { }
+        try {
+            [IO.File]::WriteAllText($env:WP_RESULT, (ConvertTo-Json -InputObject @($results) -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
+        } catch { }
     }
     exit 0
 }
@@ -431,14 +437,20 @@ if ($all.Count -eq 0) {
     Say 'Системные параметры (HKLM, электропитание, Планировщик):' 'Cyan'
     if ($machineEntries.Count -eq 0) {
         Say '  нечего возвращать'
-    } elseif ($isAdmin) {
+    } elseif ($isAdmin -and $env:WP_FORCE_HELPER -ne '1') {
         Stop-WinPulseTraces
         Restore-Entries $backups $true
     } else {
         $resultFile = Join-Path $backupDir "reset-result-$stamp.json"
         Say '  Windows спросит разрешение администратора — нажмите «Да».' 'White'
         try {
-            Start-Process -FilePath $env:WP_SELF -ArgumentList @('machine', "`"$backupDir`"", "`"$resultFile`"") -Verb RunAs -Wait -WindowStyle Hidden
+            # Помощник с правами администратора — тот же скрипт в режиме machine. Параметры передаём через
+            # -EncodedCommand: так пути с пробелами, кавычками и кириллицей доходят без искажений.
+            function Quote([string]$text) { "'" + $text.Replace("'", "''") + "'" }
+            $inner = "`$env:WP_MODE='machine'; `$env:WP_BACKUP=$(Quote $backupDir); `$env:WP_RESULT=$(Quote $resultFile); " +
+                "`$env:WP_SELF=$(Quote $env:WP_SELF); & ([ScriptBlock]::Create([IO.File]::ReadAllText(`$env:WP_SELF, [Text.Encoding]::UTF8)))"
+            $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($inner))
+            Start-Process -FilePath 'powershell.exe' -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded" -Verb RunAs -Wait -WindowStyle Hidden
             if (Test-Path -LiteralPath $resultFile) {
                 $machineResults = @([IO.File]::ReadAllText($resultFile, [Text.Encoding]::UTF8) | ConvertFrom-Json)
                 foreach ($r in $machineResults) {
@@ -447,11 +459,16 @@ if ($all.Count -eq 0) {
                     Say $line $(if ($r.Ok) { 'Green' } else { 'Red' })
                 }
                 Remove-Item -LiteralPath $resultFile -ErrorAction SilentlyContinue
+                if (@($machineResults | Where-Object { $_.TargetId -ne 'helper' }).Count -eq 0) {
+                    Say '  Помощник не нашёл системных изменений для возврата.' 'Red'
+                }
             } else {
                 Say '  Помощник с правами администратора не вернул результат.' 'Red'
+                foreach ($e in $machineEntries) { Add-Result '' $e $false 'помощник с правами администратора не сработал' }
             }
         } catch {
             Say '  Права администратора не выданы — системные параметры не возвращены. Запустите файл ещё раз и нажмите «Да».' 'Red'
+            foreach ($e in $machineEntries) { Add-Result '' $e $false 'права администратора не выданы' }
         }
     }
 

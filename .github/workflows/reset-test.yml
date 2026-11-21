@@ -80,13 +80,21 @@ jobs:
           logman start WinPulseTestSession -p Microsoft-Windows-Kernel-Process -ets | Out-Null
           Get-Content "$dir\windowed-games.json" -TotalCount 25
 
-      - name: Run WinPulse-Reset.cmd
-        shell: cmd
+      # Как у пользователя: файл лежит в папке с пробелами и кириллицей, а системная часть выполняется
+      # отдельным помощником с правами администратора (WP_FORCE_HELPER — тот же путь, что без прав).
+      - name: Run WinPulse-Reset.cmd (helper path, Cyrillic folder)
+        shell: powershell
         env:
           WP_YES: '1'
+          WP_FORCE_HELPER: '1'
         run: |
-          call tools\WinPulse-Reset.cmd
-          echo exit code %ERRORLEVEL%
+          $name = (New-Object string (,[char[]](0x0420,0x0430,0x0431,0x043E,0x0447,0x0438,0x0439))) + ' ' + (New-Object string (,[char[]](0x0441,0x0442,0x043E,0x043B)))
+          $dir = Join-Path $env:USERPROFILE $name
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item tools\WinPulse-Reset.cmd (Join-Path $dir 'WinPulse-Reset.cmd')
+          Write-Output "running from: $dir"
+          & cmd.exe /c (Join-Path $dir 'WinPulse-Reset.cmd')
+          Write-Output "exit code $LASTEXITCODE"
 
       - name: Verify
         shell: powershell
