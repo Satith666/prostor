@@ -1,0 +1,123 @@
+name: Reset script test
+
+# Проверка tools/WinPulse-Reset.cmd на настоящей Windows: имитируем изменения WinPulse (реестр HKCU/HKLM,
+# подзначения DirectX, двоичное значение автозагрузки, схема питания, задание Планировщика, сессия ETW),
+# кладём резервные копии в том же формате, что пишет WinPulse, запускаем скрипт и сверяем результат.
+on:
+  push:
+    paths:
+      - 'tools/WinPulse-Reset.cmd'
+      - '.github/workflows/reset-test.yml'
+  workflow_dispatch:
+
+jobs:
+  reset:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Simulate WinPulse changes
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Guid-Of($text) { ([regex]'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}').Match(($text | Out-String)).Value.ToLower() }
+
+          # Исходное состояние
+          New-Item -Force 'HKCU:\Software\WinPulseTest' | Out-Null
+          New-ItemProperty 'HKCU:\Software\WinPulseTest' -Name A -Value 1 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty 'HKCU:\Software\WinPulseTest' -Name S -Value 'X=1;Y=2;' -PropertyType String -Force | Out-Null
+          New-ItemProperty 'HKCU:\Software\WinPulseTest' -Name Bin -Value ([byte[]](2,0,0,0,0,0,0,0,0,0,0,0)) -PropertyType Binary -Force | Out-Null
+          New-Item -Force 'HKLM:\SOFTWARE\WinPulseTest' | Out-Null
+          New-ItemProperty 'HKLM:\SOFTWARE\WinPulseTest' -Name M -Value 7 -PropertyType DWord -Force | Out-Null
+          New-ItemProperty 'HKLM:\SOFTWARE\WinPulseTest' -Name Multi -Value @('a','b') -PropertyType MultiString -Force | Out-Null
+          Register-ScheduledTask -TaskName 'WinPulseTestTask' -TaskPath '\WinPulseTest\' -Action (New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c exit') -Trigger (New-ScheduledTaskTrigger -AtLogOn) | Out-Null
+          $orig = Guid-Of (powercfg /getactivescheme)
+          $dup = Guid-Of (powercfg /duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+          "ORIG=$orig" | Out-File -Append $env:GITHUB_ENV -Encoding ascii
+          "DUP=$dup" | Out-File -Append $env:GITHUB_ENV -Encoding ascii
+
+          # Резервные копии — как их пишет WinPulse (System.Text.Json, перечисления строками)
+          $dir = Join-Path $env:LOCALAPPDATA 'WinPulse\backups'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          function R($hive, $key, $name, $existed, $kind, $data, $sub = $null) {
+            [ordered]@{ TargetId = ("reg:$hive\$key\$name" + $(if ($sub) { "#$sub" } else { '' })).ToLower(); ItemId = 'test'; SavedAt = (Get-Date).ToString('o'); Kind = 'registry'; Title = "test $name";
+              Hive = $hive; Key = $key; ValueName = $name; SubKey = $sub; Existed = $existed; ValueKind = $kind; Data = $data }
+          }
+          $wg = [ordered]@{ Version = 1; Module = 'windowed-games'; Entries = @(
+            (R 'CurrentUser' 'Software\WinPulseTest' 'A' $true 'DWord' '1'),
+            (R 'CurrentUser' 'Software\WinPulseTest' 'B' $false 'DWord' $null),
+            (R 'CurrentUser' 'Software\WinPulseTest' 'S' $true 'String' '2' 'Y'),
+            (R 'CurrentUser' 'Software\WinPulseTest' 'S' $false 'String' $null 'Z'),
+            (R 'LocalMachine' 'SOFTWARE\WinPulseTest' 'M' $true 'DWord' '7'),
+            (R 'LocalMachine' 'SOFTWARE\WinPulseTest' 'N' $false 'DWord' $null),
+            (R 'LocalMachine' 'SOFTWARE\WinPulseTest' 'Multi' $true 'MultiString' "a`nb"),
+            [ordered]@{ TargetId = 'power:active'; ItemId = 'power'; Kind = 'power'; Title = 'power'; Existed = $true; SchemeGuid = $orig; SchemeName = 'Original'; CreatedSchemeGuid = $dup },
+            [ordered]@{ TargetId = 'task:\winpulsetest\winpulsetesttask'; ItemId = 'startup'; Kind = 'task'; Title = 'task'; Existed = $true; TaskPath = '\WinPulseTest\WinPulseTestTask'; Data = '1' }
+          ) }
+          $st = [ordered]@{ Version = 1; Module = 'startup'; Entries = @(
+            (R 'CurrentUser' 'Software\WinPulseTest' 'Bin' $true 'Binary' ([Convert]::ToBase64String([byte[]](2,0,0,0,0,0,0,0,0,0,0,0))))
+          ) }
+          $nv = [ordered]@{ Version = 1; Module = 'nvidia'; Entries = @(
+            [ordered]@{ TargetId = 'nv:game.exe:10835002'; ItemId = 'nv-fpscap'; Kind = 'nvidia'; Title = 'fps cap'; Existed = $false; NvApp = 'game.exe'; NvAppName = 'Test Game'; NvSettingId = 277041154 }
+          ) }
+          # Без BOM, как у WinPulse
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          [IO.File]::WriteAllText("$dir\windowed-games.json", ($wg | ConvertTo-Json -Depth 5), $utf8)
+          [IO.File]::WriteAllText("$dir\startup.json", ($st | ConvertTo-Json -Depth 5), $utf8)
+          [IO.File]::WriteAllText("$dir\nvidia.json", ($nv | ConvertTo-Json -Depth 5), $utf8)
+
+          # «Изменения WinPulse»
+          Set-ItemProperty 'HKCU:\Software\WinPulseTest' -Name A -Value 0
+          New-ItemProperty 'HKCU:\Software\WinPulseTest' -Name B -Value 1 -PropertyType DWord -Force | Out-Null
+          Set-ItemProperty 'HKCU:\Software\WinPulseTest' -Name S -Value 'X=1;Y=5;Z=1;'
+          Set-ItemProperty 'HKCU:\Software\WinPulseTest' -Name Bin -Value ([byte[]](3,0,0,0,9,9,9,9,9,9,9,9))
+          Set-ItemProperty 'HKLM:\SOFTWARE\WinPulseTest' -Name M -Value 0
+          New-ItemProperty 'HKLM:\SOFTWARE\WinPulseTest' -Name N -Value 1 -PropertyType DWord -Force | Out-Null
+          Set-ItemProperty 'HKLM:\SOFTWARE\WinPulseTest' -Name Multi -Value @('z')
+          Disable-ScheduledTask -TaskPath '\WinPulseTest\' -TaskName 'WinPulseTestTask' | Out-Null
+          powercfg /setactive $dup
+          logman start WinPulseTestSession -p Microsoft-Windows-Kernel-Process -ets | Out-Null
+          Get-Content "$dir\windowed-games.json" -TotalCount 25
+
+      - name: Run WinPulse-Reset.cmd
+        shell: cmd
+        env:
+          WP_YES: '1'
+        run: |
+          call tools\WinPulse-Reset.cmd
+          echo exit code %ERRORLEVEL%
+
+      - name: Verify
+        shell: powershell
+        run: |
+          $fail = @()
+          function Check($what, $ok) { if ($ok) { Write-Output "OK   $what" } else { Write-Output "FAIL $what"; $script:fail += $what } }
+          $u = Get-ItemProperty 'HKCU:\Software\WinPulseTest'
+          $m = Get-ItemProperty 'HKLM:\SOFTWARE\WinPulseTest'
+          Check 'HKCU A = 1' ($u.A -eq 1)
+          Check 'HKCU B removed' ($null -eq $u.PSObject.Properties['B'])
+          Check "HKCU S = X=1;Y=2; (now '$($u.S)')" ($u.S -eq 'X=1;Y=2;')
+          Check 'HKCU Bin restored' (($u.Bin -join ',') -eq '2,0,0,0,0,0,0,0,0,0,0,0')
+          Check 'HKLM M = 7' ($m.M -eq 7)
+          Check 'HKLM N removed' ($null -eq $m.PSObject.Properties['N'])
+          Check "HKLM Multi = a,b (now '$($m.Multi -join ',')')" (($m.Multi -join ',') -eq 'a,b')
+          Check 'task enabled again' ((Get-ScheduledTask -TaskPath '\WinPulseTest\' -TaskName 'WinPulseTestTask').State -ne 'Disabled')
+          $active = (powercfg /getactivescheme | Out-String).ToLower()
+          Check 'original power plan active' ($active.Contains($env:ORIG))
+          Check 'WinPulse copy of power plan deleted' (-not (powercfg /list | Out-String).ToLower().Contains($env:DUP))
+          Check 'ETW session stopped' (-not ((logman query -ets | Out-String) -match 'WinPulseTestSession'))
+          $dir = Join-Path $env:LOCALAPPDATA 'WinPulse\backups'
+          Check 'restored backups archived' ((-not (Test-Path "$dir\windowed-games.json")) -and (-not (Test-Path "$dir\startup.json")) -and (@(Get-ChildItem $dir -Directory -Filter 'restored-*').Count -eq 1))
+          Check 'nvidia backup kept (manual)' (Test-Path "$dir\nvidia.json")
+          $report = Get-ChildItem ([Environment]::GetFolderPath('Desktop')) -Filter 'WinPulse-*.txt' | Select-Object -First 1
+          Check 'report on Desktop' ($null -ne $report)
+          if ($report) {
+            $text = [IO.File]::ReadAllText($report.FullName, [Text.Encoding]::UTF8)
+            Check 'report mentions NVIDIA manual reset' ($text -match 'Восстановить')
+            Check 'display API compiled' (-not ($text -match 'Не удалось подготовить работу с мониторами'))
+            Write-Output '----- report -----'
+            Write-Output $text
+          }
+          if ($fail.Count -gt 0) { Write-Output "::error title=Reset test::$($fail -join '; ')"; exit 1 }
+          Write-Output "::notice title=Reset test::all checks passed"
